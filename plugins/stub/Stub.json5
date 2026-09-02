@@ -1,0 +1,16 @@
+// The config template that makes the shared object beside it a plugin the frontend can launch.
+// `plugin` names that file; everything under `metadata` is what the frontend shows.
+name: "Stub",
+plugin: "stub.so",
+
+metadata: {
+    shortname: "Stub",
+    fullname: "Stub Emulator (SDK reference)",
+    manufacturer: "FPGAArcade",
+    year: "2026",
+    info: "Reference plugin. Produces a deterministic test pattern and audio ramp; emulates nothing.",
+    tags: ["Test"],
+    icon: ""
+},
+
+extensions: ["stub"]
