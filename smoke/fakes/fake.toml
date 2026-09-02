@@ -1,0 +1,5 @@
+# What the smoke host's self-test runs each fake plugin with. A short timeout, because one of them
+# is built to hang and the self-test waits it out.
+fixture = "fixture.bin"
+frames = 4
+timeout_seconds = 2

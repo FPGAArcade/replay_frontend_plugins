@@ -1,0 +1,16 @@
+# The smoke run for this plugin: ./build.sh stub --smoke.
+# Paths are relative to this file.
+
+# What the plugin mounts. Every fixture needs a <fixture>.provenance.toml beside it naming where it
+# came from and what it is licensed under; a run whose fixture has none fails.
+fixture = "smoke/fixture.stub"
+
+# How many frames to run before the assertions. Long enough that the plugin is past anything that
+# would still look blank, and no longer.
+frames = 10
+
+# The watchdog: a run that has not finished by then is a hang.
+timeout_seconds = 10
+
+# Whether the run also asserts that the plugin produced audio. Optional, false when omitted.
+audio = true

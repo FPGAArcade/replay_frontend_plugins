@@ -1,0 +1,4 @@
+# A smoke run naming a fixture with no provenance record. Every plugin fails this one.
+fixture = "unprovenanced.bin"
+frames = 1
+timeout_seconds = 5

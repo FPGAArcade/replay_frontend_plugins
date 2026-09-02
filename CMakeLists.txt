@@ -21,3 +21,7 @@ foreach(plugin IN LISTS REPLAY_PLUGINS)
     set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/plugins/${plugin}")
     add_subdirectory("plugins/${plugin}")
 endforeach()
+
+# The smoke host and its fake plugins. Built with everything, so ./build.sh --smoke is always there
+# and the fakes never go stale beside the host they test.
+add_subdirectory(smoke)

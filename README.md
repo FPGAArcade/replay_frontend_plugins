@@ -61,6 +61,8 @@ plugins/<name>/
     CMakeLists.txt      one add_replay_emu_plugin() call
     <name>_plugin.c     the glue: the RpEmuAPI the frontend drives
     <Name>.json5        the config template deployed beside the shared object
+    smoke.toml          the boot smoke: fixture, frame count, whether audio is asserted
+    smoke/              the fixtures smoke.toml names, each with its provenance record
     LICENSES/           every licence the built artifact is distributed under
     patches/            the patch series applied to upstream/, in order
     upstream/           submodule, pinned at a commit of the emulator's own repository
@@ -73,6 +75,52 @@ A real emulator is never copied into this repository. It arrives as a submodule 
 upstream pinned at a commit, with our changes as a patch series beside it, so provenance stays
 honest and this repository's history stays small. `./build.sh` initialises those submodules
 shallowly (`--depth 1`) and only for the plugins being built.
+
+## Smoke
+
+"It loads" is not "it runs". Every plugin here carries a `smoke.toml`, and the smoke host boots the
+built shared object against it: mount the fixture, run the frames, and fail unless the plugin is
+still running with a framebuffer that is not blank.
+
+```bash
+./build.sh stub --smoke
+```
+
+is informational — it prints the verdict and leaves the build's own exit status alone. The gate
+that stops a plugin being published lives in the release pipeline.
+
+`smoke.toml` is the whole of it; adding a plugin's smoke is writing one file:
+
+```toml
+fixture = "smoke/fixture.stub"   # relative to this file
+frames = 10                      # run this many before the assertions
+timeout_seconds = 10             # longer than this is a hang, not a slow core
+audio = true                     # also assert the plugin produced audio (optional)
+```
+
+Every fixture needs a `<fixture>.provenance.toml` beside it, and a run whose fixture has none
+fails:
+
+```toml
+source = "where this file came from"
+license = "what it is distributed under"
+```
+
+Prefer an open BIOS replacement over a dumped ROM — EmuTOS, AROS, the open C64 ROMs. A private CI
+ROM store is the fallback for a system that has no open equivalent, and is recorded as such in the
+fixture's provenance; it is never the default.
+
+`smoke/` holds the host itself. It is SDK-only: it links nothing of the frontend, and the
+`fl_*`/`arena_*` symbols a plugin binds to come from the host executable, which is the frontend's
+side of the same ABI in miniature. A plugin calling a host symbol the smoke host does not implement
+fails at load with that symbol named, and the fix is to implement it there.
+
+`smoke/selftest.sh` is the host's own test. It checks that the stub passes, that a working fake
+passes, and that each way a plugin or its configuration can fail does fail *and says why*: a plugin
+built to hang, one with a blank framebuffer, one reporting the wrong ABI version, one leaving a
+required vtable slot empty, one asserting audio it never produces, a fixture without provenance,
+and a malformed `smoke.toml`. It also runs `./build.sh stub --smoke` both ways, to check that a red
+smoke still leaves the build's exit status alone. Run it after changing anything under `smoke/`.
 
 ## The shared `cmake/`
 

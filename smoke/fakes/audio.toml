@@ -1,0 +1,5 @@
+# A smoke that asserts audio, run against a fake that produces none.
+fixture = "fixture.bin"
+frames = 4
+timeout_seconds = 5
+audio = true

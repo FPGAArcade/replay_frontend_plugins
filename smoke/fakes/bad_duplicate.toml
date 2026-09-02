@@ -1,0 +1,4 @@
+fixture = "fixture.bin"
+frames = 4
+frames = 8
+timeout_seconds = 5

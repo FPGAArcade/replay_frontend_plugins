@@ -1,0 +1,2 @@
+The stub emulator reads no media, so this file's contents are never parsed. It exists because a
+smoke run mounts a fixture, and every fixture carries a provenance record beside it.

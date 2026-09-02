@@ -4,6 +4,7 @@
 #   ./build.sh stub                  debug build of plugins/stub
 #   ./build.sh stub release          release build
 #   ./build.sh stub --deploy         build, then drop it where the frontend will find it
+#   ./build.sh stub --smoke          build, then run the plugin's smoke (informational)
 #   ./build.sh stub --sdk-dir ~/replay_frontend/build/x64-debug/sdk
 #   ./build.sh --list                what is in plugins/
 #
@@ -20,6 +21,7 @@ plugins=()
 config="debug"
 sdk_dir=""
 deploy=0
+smoke=0
 deploy_dir="${REPLAY_SIDELOAD_DIR:-$sideload_default}"
 clean=0
 
@@ -32,6 +34,7 @@ usage() {
     echo "  --sdk-dir DIR     build against a local SDK tree instead of the pinned submodule"
     echo "  --deploy          copy the built plugin and its config template to the sideload directory"
     echo "  --deploy-dir DIR  where --deploy copies to (default \$REPLAY_SIDELOAD_DIR, else $sideload_default)"
+    echo "  --smoke           run the plugin's smoke.toml through the smoke host; informational only"
     echo "  --clean           remove the build directory first"
     echo "  --list            list the plugins in this repository"
 }
@@ -47,6 +50,7 @@ while (($#)); do
         debug|release|asan) config="$1" ;;
         --sdk-dir) sdk_dir="${2:?--sdk-dir needs a path}"; shift ;;
         --deploy) deploy=1 ;;
+        --smoke) smoke=1 ;;
         --deploy-dir) deploy_dir="${2:?--deploy-dir needs a path}"; shift ;;
         --clean) clean=1 ;;
         --list) list_plugins; exit 0 ;;
@@ -122,6 +126,23 @@ NINJA_STATUS="${marker}[%f/%t] " cmake --build "$build_dir"
 for plugin in "${plugins[@]}"; do
     say "Built ${build_dir}/plugins/${plugin}/${plugin}.so"
 done
+
+# Informational: a red smoke here is a signal to look, not a build failure. The gate that stops a
+# plugin being published lives in the release pipeline, not in a local build.
+if ((smoke)); then
+    for plugin in "${plugins[@]}"; do
+        config_file="plugins/${plugin}/smoke.toml"
+        if [[ ! -f "$config_file" ]]; then
+            say "No ${config_file}, so ${plugin} has no smoke to run"
+            continue
+        fi
+        if "${build_dir}/smoke/replay_smoke" "${build_dir}/plugins/${plugin}/${plugin}.so" "$config_file"; then
+            say "Smoke passed for ${plugin}"
+        else
+            say "Smoke FAILED for ${plugin} (informational; the build itself is fine)"
+        fi
+    done
+fi
 
 if ((deploy)); then
     for plugin in "${plugins[@]}"; do
