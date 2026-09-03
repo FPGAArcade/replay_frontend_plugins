@@ -22,8 +22,6 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       # A tag here would let CI and a contributor build with different compilers while both
       # looked correct, so it is refused before anything is built.
@@ -45,8 +43,6 @@ jobs:
         target: [x86_64, aarch64]
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - name: Build through the pinned image
         run: ./build.sh stub release --docker --target ${{ matrix.target }}
@@ -73,7 +69,7 @@ jobs:
               build=build/docker-${{ matrix.target }}-release
           fi
           elsewhere="${RUNNER_TEMP}/a-different-path"
-          git clone --recurse-submodules --shared . "$elsewhere"
+          git clone --shared . "$elsewhere"
           (cd "$elsewhere" && ./build.sh stub release --docker --target ${{ matrix.target }})
           here="$(sha256sum "$build/plugins/stub/stub.so" | cut -d' ' -f1)"
           there="$(sha256sum "$elsewhere/$build/plugins/stub/stub.so" | cut -d' ' -f1)"

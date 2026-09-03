@@ -1,8 +1,8 @@
 # Replay emulator plugins
 
 Every emulator plugin the Replay frontend can run. Each one is a shared object built against the
-[Replay plugin SDK](https://github.com/FPGAArcade/replay_frontend_sdk), pinned here at a commit,
-plus the config template that tells the frontend what it is.
+[Replay plugin SDK](https://github.com/FPGAArcade/replay_frontend_sdk), a copy of which is carried
+in `sdk/`, plus the config template that tells the frontend what it is.
 
 The frontend does not know about this repository, and nothing here is pinned by it: the SDK is the
 only thing crossing between them, and the pin lives on this side.
@@ -21,7 +21,10 @@ only thing crossing between them, and the pin lives on this side.
 Only the plugins you name are configured, and only their submodules are fetched. Adding ScummVM to
 this repository costs nothing when you are building a small core.
 
-The first build fetches the pinned SDK into `sdk/` (a shallow submodule clone).
+`sdk/` is a verbatim copy of the SDK, not a submodule. That is a workaround and `sdk/UPSTREAM`
+says so: the SDK repository is private, and a workflow's GITHUB_TOKEN cannot read another private
+repository, so as a submodule CI could not check this repository out at all. It goes back to being
+a submodule when the SDK repository is public; nothing here depends on which of the two it is.
 
 ## Trying it
 
@@ -109,12 +112,10 @@ builds against a staged SDK from a frontend build tree instead of the pin. Every
 prints carries a `[LOCAL SDK]` marker while that is in effect, because a plugin that only builds
 against an unpublished SDK is not one anyone else can build.
 
-Once the SDK change is published, bump the pin and the marker goes away:
-
-```bash
-git -C sdk fetch && git -C sdk checkout <sha>
-git add sdk && git commit -m "Bump the SDK pin"
-```
+Once the SDK change is published, re-sync the copy and the marker goes away: replace `sdk/`
+wholesale with a fresh checkout, keep `sdk/UPSTREAM`, and record the new commit in it. Nothing in
+that directory is edited locally, so a copy that differs from its commit by anything at all is a
+mistake.
 
 ## Anatomy of a plugin
 
