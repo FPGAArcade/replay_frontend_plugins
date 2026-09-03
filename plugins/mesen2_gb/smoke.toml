@@ -1,0 +1,16 @@
+# The smoke run for this plugin: ./build.sh mesen2_gb --smoke.
+
+# A console draws nothing without a cartridge, so the smoke needs one. uCity is a complete GPL-3.0
+# homebrew game, which makes it redistributable in a way a commercial dump is not.
+fixture = "smoke/ucity.gbc"
+
+# Five seconds of the machine's own time, which is well past the boot logo.
+frames = 300
+
+# The watchdog, not a budget: the run itself takes a couple of seconds.
+timeout_seconds = 60
+
+# Not asserted: Mesen2's audio never reaches the host through this wrapper. Thirty seconds of
+# emulation produced no samples, so the capture path is not wired up rather than the machine
+# being quiet. The video assertion is the one carrying weight here.
+audio = false
