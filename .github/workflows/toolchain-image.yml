@@ -18,6 +18,8 @@ on:
     branches: [main]
     paths:
       - docker/**
+      # Recording a digest is the end of a publish, not the start of another one.
+      - '!docker/IMAGE'
       - .github/workflows/toolchain-image.yml
 
 env:

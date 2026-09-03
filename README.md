@@ -80,6 +80,13 @@ publish it, and paste the digest it prints into `docker/IMAGE`. That one edit mo
 consumer at once. It is a human step on purpose - a workflow that wrote the pin itself would
 let the compiler change without anyone reviewing it.
 
+The package is meant to be public, so that pulling it needs no credentials at all. Until it is,
+`--docker` needs a GHCR login with a token carrying `read:packages`:
+
+```bash
+gh auth refresh -s read:packages && gh auth token | docker login ghcr.io -u <you> --password-stdin
+```
+
 Rocky 8's repositories roll forward under the pinned base image, so building the same
 Dockerfile twice months apart gives two different images. The Dockerfile is the recipe; the
 published digest is the reproducibility.
