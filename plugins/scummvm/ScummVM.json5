@@ -1,0 +1,34 @@
+// ScummVM - Adventure game engine
+// Supports LucasArts, Sierra, and many other classic adventure games
+name: "ScummVM",
+plugin: "scummvm.so",
+
+metadata: {
+    shortname: "ScummVM",
+    fullname: "ScummVM Adventure Engine",
+    manufacturer: "ScummVM Team",
+    year: "2001",
+    info: "ScummVM is a program which allows you to run classic graphical adventure and role-playing games, including LucasArts SCUMM games, Sierra On-Line adventures, and many more.",
+    tags: ["Adventure", "Point-and-Click", "LucasArts", "Sierra", "RPG"],
+    icon: ""
+},
+
+extensions: ["scummvm"],
+
+bios: {
+    directory: "scummvm",
+    files: []
+},
+
+// ScummVM games are directory-based, launched via .scummvm files
+drives: {},
+
+actions: [
+    { id: "save_game", name: "Save Game", description: "Save current game progress", menu: "Game" },
+    { id: "load_game", name: "Load Game", description: "Load a saved game", menu: "Game" }
+],
+
+config: {
+    default: 0,
+    options: []
+}

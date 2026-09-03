@@ -1,0 +1,23 @@
+
+/* components */
+/* #define USE_ENET */
+/* #define USE_FMTOWNS_PC98_AUDIO */
+/* #define USE_GIF */
+/* #define USE_HNM */
+/* #define USE_IMGUI */
+/* #define USE_INDEO3 */
+/* #define USE_INDEO45 */
+/* #define USE_LUA */
+/* #define USE_VPX */
+/* #define USE_THEORADEC */
+/* #define USE_MIDI */
+/* #define USE_MPCDEC */
+/* #define USE_MPEG2 */
+/* #define USE_QDM2 */
+/* #define USE_SID_AUDIO */
+/* #define USE_SVQ1 */
+/* #define USE_TINYGL */
+/* #define USE_UNIVERSALTRACKER */
+/* #define USE_VGMTRANS_AUDIO */
+/* end of components */
+/* #define TAINTED_BUILD */
