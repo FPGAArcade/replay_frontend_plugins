@@ -109,6 +109,11 @@ build_dir="build/${config}"
 generator=()
 command -v ninja >/dev/null && generator=(-G Ninja)
 
+source "${repo_dir}/scripts/upstream.sh"
+for plugin in "${plugins[@]}"; do
+    prepare_upstream "$plugin" || exit 1
+done
+
 say "Configuring ${plugins[*]} (${config}) against ${sdk_dir}"
 selected="$(IFS=';'; echo "${plugins[*]}")"
 cmake -S . -B "$build_dir" "${generator[@]}" \

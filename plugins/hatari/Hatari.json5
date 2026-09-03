@@ -1,0 +1,111 @@
+// Hatari - Atari ST/STE/TT/Falcon emulator core
+// Based on hatariB (libretro port of Hatari)
+// Uses bundled EmuTOS as default free TOS ROM (GPLv2)
+name: "Hatari",
+plugin: "hatari.so",
+
+metadata: {
+    shortname: "Hatari",
+    fullname: "Atari ST (Hatari)",
+    manufacturer: "Atari",
+    year: "1985",
+    info: "Hatari emulates the Atari ST, STE, TT, and Falcon computers. This core uses hatariB, a libretro port, with EmuTOS bundled as a free TOS ROM replacement. Real TOS ROMs can be placed in the system directory for better compatibility.",
+    tags: ["Computer", "Atari ST", "Atari", "Motorola", "68000", "YM2149"],
+    icon: ""
+},
+
+extensions: ["st", "msa", "dim", "stx", "ipf", "ctr", "m3u", "m3u8", "zip", "gz"],
+
+// EmuTOS is bundled - no BIOS required
+// Real TOS ROMs can be placed in ~/.replay2/system/emulators/Hatari/ as tos.img for better compatibility
+
+// Drive configuration
+drives: {
+    floppy: [
+        { id: "floppy_a", name: "Floppy A", description: "Primary floppy drive", connected: true, extensions: ["st", "msa", "dim", "stx", "ipf", "zip", "gz"] },
+        { id: "floppy_b", name: "Floppy B", description: "Secondary floppy drive", connected: false, extensions: ["st", "msa", "dim", "stx", "ipf", "zip", "gz"] }
+    ],
+    hard_drive: [
+        { id: "acsi_0", name: "ACSI HD 0", description: "ACSI hard drive", connected: false, extensions: ["acsi", "ahd", "vhd"] },
+        { id: "scsi_0", name: "SCSI HD 0", description: "SCSI hard drive", connected: false, extensions: ["scsi", "shd"] },
+        { id: "ide_0", name: "IDE HD 0", description: "IDE hard drive", connected: false, extensions: ["ide"] }
+    ]
+},
+
+// OSD Actions
+actions: [
+    { id: "soft_reset", name: "Warm Reset", description: "Warm reset the Atari ST", menu: "System" },
+    { id: "hard_reset", name: "Cold Reset", description: "Power cycle the Atari ST", menu: "System" },
+    { id: "save_state", name: "Save State", description: "Save current emulator state", menu: "State" },
+    { id: "load_state", name: "Load State", description: "Load previously saved state", menu: "State" }
+],
+
+// Core configuration options
+config: {
+    default: 0,
+
+    options: [
+        //
+        // SYSTEM (runtime: false - require reset)
+        //
+        {
+            name: "Machine Type",
+            key: "MACHINE",
+            runtime: false,
+            options: [
+                { name: "ST", value: 0, note: "Atari ST (1985)" },
+                { name: "STE", value: 1, note: "Atari STE (1989)" },
+                { name: "Mega ST", value: 2 },
+                { name: "Mega STE", value: 3 },
+                { name: "TT", value: 4, note: "Atari TT030" },
+                { name: "Falcon", value: 5, note: "Atari Falcon030" }
+            ],
+            menu: "System"
+        },
+        {
+            name: "Memory Size",
+            key: "MEMORY",
+            runtime: false,
+            options: [
+                { name: "512 KB", value: 0 },
+                { name: "1 MB", value: 1, note: "Most common" },
+                { name: "2 MB", value: 2 },
+                { name: "4 MB", value: 3 },
+                { name: "8 MB", value: 4 },
+                { name: "14 MB", value: 5, note: "Maximum for ST/STE" }
+            ],
+            menu: "System"
+        },
+
+        //
+        // VIDEO (runtime: true - can change anytime)
+        //
+        {
+            name: "Aspect Ratio",
+            key: "ASPECT",
+            runtime: true,
+            options: [
+                { name: "Square Pixels", value: 0 },
+                { name: "Atari Monitor", value: 1 },
+                { name: "NTSC TV", value: 2 },
+                { name: "PAL TV", value: 3 },
+                { name: "4:3 Exact", value: 4 }
+            ],
+            menu: "Video"
+        },
+
+        //
+        // INPUT (runtime: true - can change anytime)
+        //
+        {
+            name: "Joystick Port",
+            key: "JOYPORT",
+            runtime: true,
+            options: [
+                { name: "Port 1", value: 0, note: "Most common for games" },
+                { name: "Port 0", value: 1 }
+            ],
+            menu: "Input"
+        }
+    ]
+}

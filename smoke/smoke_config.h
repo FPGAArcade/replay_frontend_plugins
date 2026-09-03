@@ -11,6 +11,7 @@
 
 typedef struct SmokeConfig {
     // Absolute path to the fixture the plugin mounts, resolved against the smoke.toml's directory.
+    // Empty when smoke.toml names no fixture, which asks the plugin to boot with nothing mounted.
     char fixture[SMOKE_PATH_MAX];
     // How many frames to run before the assertions are made.
     u32 frames;

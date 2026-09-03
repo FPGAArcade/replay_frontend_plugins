@@ -11,11 +11,16 @@
 //   FAKE_NOSLOT  leaves a required vtable slot empty
 //   FAKE_SILENT  runs correctly but emits no audio, so it passes a smoke that does not assert
 //                audio and fails one that does
+//   FAKE_NOMEDIA accepts only a null media path, the way a machine that boots from its own ROM
+//                is asked to come up with nothing mounted
+//   FAKE_STRINGS round-trips a string through the host's string_copy/string_equals and refuses to
+//                mount unless it survives
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #include <replay/plugin.h>
 
-#if !defined(FAKE_HANG) && !defined(FAKE_BLANK) && !defined(FAKE_ABI) && !defined(FAKE_NOSLOT) && !defined(FAKE_SILENT)
-#error "define one of FAKE_HANG, FAKE_BLANK, FAKE_ABI, FAKE_NOSLOT or FAKE_SILENT"
+#if !defined(FAKE_HANG) && !defined(FAKE_BLANK) && !defined(FAKE_ABI) && !defined(FAKE_NOSLOT) && \
+    !defined(FAKE_SILENT) && !defined(FAKE_NOMEDIA) && !defined(FAKE_STRINGS)
+#error "define one of FAKE_HANG, FAKE_BLANK, FAKE_ABI, FAKE_NOSLOT, FAKE_SILENT, FAKE_NOMEDIA or FAKE_STRINGS"
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -29,6 +34,7 @@
 typedef struct FakeEmu {
     u32 pixels[FAKE_WIDTH * FAKE_HEIGHT];
     u32 frame_index;
+    bool strings_ok;
 } FakeEmu;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -44,7 +50,17 @@ static void fake_get_info(RpEmuInfo* info) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 static void* fake_create(FlArena* arena) {
-    return arena_alloc_zero(arena, FakeEmu);
+    FakeEmu* emu = arena_alloc_zero(arena, FakeEmu);
+    // A real plugin reaches the host's string functions, so the host has to define them; a plugin
+    // that finds one missing fails at load, and one that finds a broken one fails far later.
+    const FlString original = string_from_cstr("floppy_a.st");
+    const FlString copied = string_copy(arena, original);
+    // Same length as the original, one byte apart, so a string_equals that only compares lengths
+    // fails here rather than passing on the round-trip alone.
+    const FlString near_miss = string_from_cstr("floppy_b.st");
+    emu->strings_ok = copied.data != original.data && string_equals(copied, original) &&
+                      !string_equals(copied, near_miss);
+    return emu;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -56,9 +72,19 @@ static void fake_destroy(void* instance) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 static bool fake_mount_media(void* instance, const char* path) {
+#if defined(FAKE_STRINGS)
+    (void)path;
+    return ((FakeEmu*)instance)->strings_ok;
+#elif defined(FAKE_NOMEDIA)
+    (void)instance;
+    // Accepts only a null path, which is what proves the host asks for a boot with nothing
+    // mounted when smoke.toml names no fixture, rather than handing over an empty string.
+    return path == nullptr;
+#else
     (void)instance;
     (void)path;
     return true;
+#endif
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

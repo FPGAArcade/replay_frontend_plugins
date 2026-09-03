@@ -278,9 +278,13 @@ static bool run_smoke(const RpEmuAPI* api, const SmokeConfig* config) {
         return false;
     }
 
-    bool ok = api->mount_media(instance, config->fixture);
+    // No fixture in smoke.toml means a null path, which is how a plugin is told to boot with
+    // nothing mounted -- a machine whose own ROM comes up to a usable screen with an empty drive.
+    const char* fixture = config->fixture[0] ? config->fixture : nullptr;
+
+    bool ok = api->mount_media(instance, fixture);
     if (!ok) {
-        fprintf(stderr, "smoke: FAIL - the plugin refused the fixture %s\n", config->fixture);
+        fprintf(stderr, "smoke: FAIL - the plugin refused %s\n", fixture ? fixture : "booting with no fixture");
     } else {
         ok = run_frames(api, instance, config);
         api->unmount_media(instance);
@@ -295,7 +299,8 @@ static bool run_smoke(const RpEmuAPI* api, const SmokeConfig* config) {
 static void usage(void) {
     fprintf(stderr, "usage: replay_smoke <plugin.so> <smoke.toml> [--plugin-log]\n"
                     "\n"
-                    "Loads a built emulator plugin, mounts the fixture smoke.toml names, runs its frames,\n"
+                    "Loads a built emulator plugin, mounts the fixture smoke.toml names (or boots with\n"
+                    "none when it names no fixture), runs its frames,\n"
                     "and fails unless the plugin is still running with a framebuffer that is not blank.\n"
                     "  --plugin-log   also print what the plugin logs\n");
 }
@@ -332,7 +337,7 @@ int main(int argc, char** argv) {
     if (!smoke_config_read(config_path, &config)) {
         return SMOKE_EXIT_USAGE;
     }
-    if (!smoke_fixture_provenance_ok(config.fixture)) {
+    if (config.fixture[0] && !smoke_fixture_provenance_ok(config.fixture)) {
         return SMOKE_EXIT_FAIL;
     }
 

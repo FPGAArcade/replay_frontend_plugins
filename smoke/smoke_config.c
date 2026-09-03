@@ -218,7 +218,7 @@ bool smoke_config_read(const char* path, SmokeConfig* out_config) {
 
     char fixture[SMOKE_PATH_MAX] = { 0 };
     TomlField fields[] = {
-        { "fixture", TomlType_String, fixture, (u32)sizeof(fixture), true, false },
+        { "fixture", TomlType_String, fixture, (u32)sizeof(fixture), false, false },
         { "frames", TomlType_U32, &out_config->frames, 0, true, false },
         { "timeout_seconds", TomlType_U32, &out_config->timeout_seconds, 0, true, false },
         { "audio", TomlType_Bool, &out_config->audio, 0, false, false },
@@ -235,6 +235,12 @@ bool smoke_config_read(const char* path, SmokeConfig* out_config) {
     if (out_config->timeout_seconds == 0 || out_config->timeout_seconds > SMOKE_MAX_TIMEOUT_SECONDS) {
         fprintf(stderr, "smoke: %s: 'timeout_seconds' must be between 1 and %u\n", path, SMOKE_MAX_TIMEOUT_SECONDS);
         return false;
+    }
+
+    // A smoke.toml with no fixture leaves it empty, which asks the plugin to boot with nothing
+    // mounted; resolving "" here would hand back the smoke.toml's own directory instead.
+    if (fixture[0] == '\0') {
+        return true;
     }
 
     return resolve_beside(path, fixture, out_config->fixture, (u32)sizeof(out_config->fixture));

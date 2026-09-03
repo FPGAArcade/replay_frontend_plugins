@@ -2,3 +2,7 @@
 	path = sdk
 	url = git@github.com:FPGAArcade/replay_frontend_sdk.git
 	shallow = true
+[submodule "plugins/hatari/upstream"]
+	path = plugins/hatari/upstream
+	url = https://github.com/bbbradsmith/hatariB.git
+	shallow = true

@@ -2,6 +2,7 @@
 
 #include <flowi/arena/arena.h>
 #include <flowi/core/log.h>
+#include <flowi/string/string.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -77,6 +78,26 @@ void* arena_alloc_raw_zero(FlArena* arena, u64 size, u64 alignment) {
         memset(memory, 0, size);
     }
     return memory;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+FlString string_copy(FlArena* arena, FlString str) {
+    if (string_is_empty(str)) {
+        return string_empty();
+    }
+    // Null-terminated as well as length-carrying: a plugin that hands the result to a C library
+    // expects the terminator, and one byte per copy is nothing against a smoke run's arena.
+    char* copy = (char*)arena_bump(arena, str.length + 1, 1);
+    memcpy(copy, str.data, str.length);
+    copy[str.length] = '\0';
+    return string_from_cstr_len(copy, str.length);
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+bool string_equals(FlString a, FlString b) {
+    return a.length == b.length && (a.length == 0 || memcmp(a.data, b.data, a.length) == 0);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

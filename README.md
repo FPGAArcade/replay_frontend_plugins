@@ -14,6 +14,7 @@ only thing crossing between them, and the pin lives on this side.
 ./build.sh stub release         # release
 ./build.sh stub asan            # debug + AddressSanitizer
 ./build.sh stub --deploy        # build, then install it where the frontend looks
+./build.sh hatari               # a real emulator: fetches its upstream, then builds it
 ./build.sh --list               # what is here
 ```
 
@@ -74,7 +75,13 @@ upstream, so it carries neither `upstream/` nor `patches/`.
 A real emulator is never copied into this repository. It arrives as a submodule of its *original*
 upstream pinned at a commit, with our changes as a patch series beside it, so provenance stays
 honest and this repository's history stays small. `./build.sh` initialises those submodules
-shallowly (`--depth 1`) and only for the plugins being built.
+shallowly (`--depth 1`) and only for the plugins being built, then applies that plugin's
+`patches/*.patch` in filename order. Both halves are idempotent, so building again does neither
+twice, and together they mean the pin plus the series reproduce the exact source that builds.
+
+A change to an emulator's own source is added as a numbered patch (`git format-patch` output,
+`0001-...`), never committed into `upstream/`. `plugins/hatari` is the worked example: it pins
+hatariB and its series is empty, because hatariB needs no changes to build against the SDK.
 
 ## Smoke
 
@@ -92,11 +99,21 @@ that stops a plugin being published lives in the release pipeline.
 `smoke.toml` is the whole of it; adding a plugin's smoke is writing one file:
 
 ```toml
-fixture = "smoke/fixture.stub"   # relative to this file
+fixture = "smoke/fixture.stub"   # relative to this file; optional, see below
 frames = 10                      # run this many before the assertions
 timeout_seconds = 10             # longer than this is a hang, not a slow core
 audio = true                     # also assert the plugin produced audio (optional)
 ```
+
+A machine that comes up on its own ROM with an empty drive omits `fixture` entirely. The host then
+mounts nothing -- the plugin is handed a null path -- and asserts against the screen the machine
+reaches by itself. `plugins/hatari` is the example: hatariB compiles EmuTOS in, so its smoke boots
+to the EmuTOS desktop with no file to ship and nothing to license.
+
+`frames` has to run past the whole boot, not just the first picture. A machine typically draws a
+boot screen, blanks while it clears for the desktop, and only then settles -- hatari is non-blank
+by frame 450, blank from about 500 to 750, and settled from 800 -- so a count chosen just past the
+first picture lands in the gap and fails.
 
 Every fixture needs a `<fixture>.provenance.toml` beside it, and a run whose fixture has none
 fails:
@@ -122,10 +139,43 @@ required vtable slot empty, one asserting audio it never produces, a fixture wit
 and a malformed `smoke.toml`. It also runs `./build.sh stub --smoke` both ways, to check that a red
 smoke still leaves the build's exit status alone. Run it after changing anything under `smoke/`.
 
+## Tests
+
+Two suites, both self-contained and offline:
+
+```bash
+smoke/selftest.sh              # the smoke host: 18 cases
+scripts/upstream_selftest.sh   # prepare_upstream: 6 cases
+```
+
+`smoke/selftest.sh` is described above. `scripts/upstream_selftest.sh` covers the half of
+`./build.sh` that every emulator plugin depends on and no plugin's own build exercises: that an
+uninitialised upstream is fetched, that its patch series is applied, that a second run refetches
+and reapplies nothing, and that a patch which does not apply stops the build with the reason. It
+builds a throwaway repository under `/tmp` shaped like this one, so it needs neither the network
+nor a checked-out emulator.
+
 ## The shared `cmake/`
 
 `cmake/ReplayPlugins.cmake` resolves the SDK, applies the repository-wide configuration, and
 includes the SDK's own `ReplaySDK.cmake`. A plugin's `CMakeLists.txt` needs nothing else.
+
+## Upstream mirrors
+
+Every emulator here is pinned at a commit of a repository we do not control, so the pin is only as
+durable as the upstream. Against that, FPGAArcade is to keep a mirror of each one. The mirrors are
+insurance, never the build's source: `.gitmodules` points at the real upstream, and a mirror would
+be switched to by hand if an upstream went away.
+
+| Plugin | Upstream |
+|--------|----------|
+| hatari | https://github.com/bbbradsmith/hatariB |
+| mesen2 | https://github.com/SourMesen/Mesen2 |
+| scummvm | https://github.com/scummvm/scummvm |
+| vamiga | https://github.com/dirkwhoffmann/vAmiga |
+| vice | https://sourceforge.net/projects/vice-emu (Subversion; git mirror at https://github.com/VICE-Team/svn-mirror) |
+
+Creating the FPGAArcade-owned mirrors is a manual step and is not done yet.
 
 ## Licensing
 
