@@ -54,9 +54,12 @@ jobs:
           docker push "$IMAGE:${{ github.sha }}"
           docker push "$IMAGE:latest"
 
+      # To the log as well as the summary. A digest that can only be read from one of the two
+      # is a digest someone has to go hunting for, and this is the whole output of the job.
       - name: Print the digest to pin
         run: |
           digest="$(docker buildx imagetools inspect "$IMAGE:${{ github.sha }}" --format '{{ .Manifest.Digest }}')"
+          echo "${IMAGE}@${digest}"
           {
               echo "## Pin this in \`docker/IMAGE\`"
               echo
