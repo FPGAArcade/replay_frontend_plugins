@@ -6,11 +6,10 @@
 # static libraries, and those carry their own symbols and their own C++ runtime needs. These
 # settings are directory-wide for that reason: they cover the upstream sources too.
 #
-# Two settings from the equivalent playback file are deliberately absent. A Replay plugin
-# links nothing of the host and leaves every fl_*/rp_* call undefined for the loader to bind
-# at load time, so -Wl,-z,defs would reject a correctly built plugin, and a --version-script
-# would hide the very entry point the host looks up. The SDK's check_plugin.sh is what audits
-# those symbols instead, since the link step structurally cannot.
+# One setting from the equivalent playback file is deliberately absent. A Replay plugin links
+# nothing of the host and leaves every fl_*/rp_* call undefined for the loader to bind at load
+# time, so -Wl,-z,defs would reject a correctly built plugin. The SDK's check_plugin.sh is what
+# audits those imports instead, since the link step structurally cannot.
 
 # Hidden by default, so a plugin exports its entry point and nothing else. C is set here as
 # well as by the SDK: the SDK's is a target property on the plugin itself, and this reaches
@@ -25,10 +24,13 @@ if(NOT WIN32)
     # dynamic reference to it would resolve against a runtime too old to satisfy it - and only
     # on device, at load, long after every check here passed. Linking it in statically removes
     # the question. --exclude-libs,ALL then stops those static libraries re-exporting their
-    # symbols out of the plugin, which would otherwise collide with the host's own copies.
+    # symbols out of the plugin, which would otherwise collide with the host's own copies. What
+    # it cannot reach is what the plugin's own objects instantiate out of libstdc++'s headers,
+    # and the version script is what localises those; see plugin_exports.map for why.
     string(APPEND CMAKE_SHARED_LINKER_FLAGS
         " -static-libstdc++ -static-libgcc"
-        " -Wl,--exclude-libs,ALL")
+        " -Wl,--exclude-libs,ALL"
+        " -Wl,--version-script=${CMAKE_CURRENT_LIST_DIR}/plugin_exports.map")
 
     foreach(lang C CXX)
         # Build paths and timestamps are the two things that make an otherwise identical

@@ -1,0 +1,25 @@
+# The dynamic symbol table of every published plugin: the symbols the host looks up, and
+# nothing else.
+#
+# Hidden visibility alone does not get there. libstdc++'s headers declare namespace std with
+# explicit default visibility, so an out-of-line template member instantiated in a plugin -
+# std::vector<std::string>::_M_realloc_insert is the one that shows up first - is exported
+# whatever -fvisibility=hidden says, and --exclude-libs cannot reach it because it was
+# instantiated in the plugin's own objects rather than pulled from libstdc++.a. Two plugins
+# doing that export the same symbol, and the loader binds both to whichever it saw first.
+#
+# Only defined symbols are affected. The fl_*/rp_* calls a plugin makes stay undefined for the
+# host to bind at load, so localising everything here does not touch them.
+#
+# Two patterns, covering four names. rp_emu_plugin_get and rp_ui_plugin_get are the entry
+# points, and a plugin defines exactly one of them; rp_emu_plugin_abi_version is optional and a
+# plugin that carries it is asking to be version-checked, so localising it would turn a
+# rejection into a silent pass. Patterns rather than names because lld makes an unmatched name
+# in `global:` a link error, while an unmatched pattern is allowed.
+{
+    global:
+        rp_*_plugin_get;
+        rp_*_plugin_abi_version;
+    local:
+        *;
+};
