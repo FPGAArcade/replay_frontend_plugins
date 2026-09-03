@@ -1,0 +1,766 @@
+// vAmiga - Cycle-accurate Amiga 500/1000/2000 emulator core
+// Configuration based on vAmiga's Swift UI settings
+name: "vAmiga",
+plugin: "vamiga.so",
+launch_helper: "amiga",  // Platform-specific boot file detection (launch_helpers/amiga/)
+
+metadata: {
+    shortname: "vAmiga",
+    fullname: "Commodore Amiga (vAmiga)",
+    manufacturer: "Commodore",
+    year: "1985",
+    info: "vAmiga is a cycle-exact Amiga 500, 1000, and 2000 emulator created by Dirk W. Hoffmann. It accurately emulates the original Amiga custom chipset (OCS/ECS) including Agnus, Denise, and Paula.",
+    tags: ["Computer", "Amiga", "Commodore", "Motorola", "68000", "OCS", "ECS"],
+    icon: ""
+},
+
+extensions: ["adf", "adz", "dms", "hdf", "hdz", "img", "ima"],
+
+bios: {
+    directory: "amiga",
+    files: [
+        {
+            name: "kick13.rom",
+            description: "Kickstart 1.3 ROM (A500, Rev 34.5)",
+            size: 262144,
+            sha256: "e40a5dfb3d017ba8779faba30cbd1c8e19f0ad2e6a8be3fc9f780be7a7e74b73",
+            required: true,
+            note: "Standard A500 ROM, required for most games"
+        },
+        {
+            name: "kick12.rom",
+            description: "Kickstart 1.2 ROM (A500, Rev 33.180)",
+            size: 262144,
+            sha256: "891e9a547772fe0c6c19b610baf8bc4ea7fcb785057f26995067ce59e8502b03",
+            required: false,
+            note: "Early A500 ROM, needed for some older software"
+        },
+        {
+            name: "kick204.rom",
+            description: "Kickstart 2.04 ROM (A500+)",
+            size: 524288,
+            sha256: "c5839f5cb98a7a8947065c3ed2f14f5f42e334a1e10cd8f0e9c78e2e5a50c511",
+            required: false,
+            note: "Required for A500+ emulation"
+        },
+        {
+            name: "kick31.rom",
+            description: "Kickstart 3.1 ROM (A1200/A4000)",
+            size: 524288,
+            sha256: "e21545723fe8374e91342617604f1b3d703094f1a1e0c5b8939bd0ca80d71fae",
+            required: false,
+            note: "Required for AGA chipset emulation"
+        }
+    ]
+},
+
+// Floppy and hard drive configuration
+drives: {
+    floppy: [
+        { id: "df0", name: "DF0", description: "Internal floppy drive", connected: true, extensions: ["adf", "adz", "dms", "img", "ima"] },
+        { id: "df1", name: "DF1", description: "External floppy drive 1", connected: false, extensions: ["adf", "adz", "dms", "img", "ima"] },
+        { id: "df2", name: "DF2", description: "External floppy drive 2", connected: false, extensions: ["adf", "adz", "dms", "img", "ima"] },
+        { id: "df3", name: "DF3", description: "External floppy drive 3", connected: false, extensions: ["adf", "adz", "dms", "img", "ima"] }
+    ],
+    hard: [
+        { id: "hd0", name: "HD0", description: "Hard drive 0", connected: false, extensions: ["hdf", "hdz"] },
+        { id: "hd1", name: "HD1", description: "Hard drive 1", connected: false, extensions: ["hdf", "hdz"] },
+        { id: "hd2", name: "HD2", description: "Hard drive 2", connected: false, extensions: ["hdf", "hdz"] },
+        { id: "hd3", name: "HD3", description: "Hard drive 3", connected: false, extensions: ["hdf", "hdz"] }
+    ]
+},
+
+// OSD Actions
+actions: [
+    { id: "soft_reset", name: "Soft Reset", description: "Reset the Amiga (Ctrl+Amiga+Amiga)", menu: "System" },
+    { id: "hard_reset", name: "Hard Reset", description: "Power cycle the Amiga", menu: "System" },
+    { id: "save_state", name: "Save State", description: "Save current emulator state", menu: "State" },
+    { id: "load_state", name: "Load State", description: "Load previously saved state", menu: "State" }
+],
+
+// Amiga model presets
+presets: [
+    {
+        id: "a500",
+        name: "Amiga 500",
+        description: "Standard A500 configuration",
+        settings: {
+            "AGNUS.REVISION": 2,
+            "DENISE.REVISION": 0,
+            "RTC.MODEL": 0,
+            "MEM.BANKMAP": 0
+        }
+    },
+    {
+        id: "a1000",
+        name: "Amiga 1000",
+        description: "Original A1000 configuration",
+        settings: {
+            "AGNUS.REVISION": 0,
+            "DENISE.REVISION": 0,
+            "RTC.MODEL": 0,
+            "MEM.BANKMAP": 1
+        }
+    },
+    {
+        id: "a2000",
+        name: "Amiga 2000",
+        description: "A2000 configuration",
+        settings: {
+            "AGNUS.REVISION": 3,
+            "DENISE.REVISION": 0,
+            "RTC.MODEL": 1,
+            "MEM.BANKMAP": 2
+        }
+    },
+    {
+        id: "a500plus",
+        name: "Amiga 500+",
+        description: "A500+ with ECS chipset",
+        settings: {
+            "AGNUS.REVISION": 3,
+            "DENISE.REVISION": 1,
+            "RTC.MODEL": 1,
+            "MEM.BANKMAP": 0
+        }
+    }
+],
+
+// Core configuration options
+// runtime: true  = can be changed while emulator is running (shown in OSD)
+// runtime: false = requires reset to take effect (shown in settings before launch)
+config: {
+    default: 0,
+
+    options: [
+        //
+        // HARDWARE - Chipset (runtime: false - require reset)
+        //
+        {
+            name: "Video Standard",
+            key: "AMIGA.VIDEO_FORMAT",
+            runtime: false,
+            options: [
+                { name: "PAL", value: 0 },
+                { name: "NTSC", value: 1 }
+            ],
+            menu: "Hardware"
+        },
+        {
+            name: "CPU Revision",
+            key: "CPU.REVISION",
+            runtime: false,
+            options: [
+                { name: "68000", value: 0, note: "Original Amigas" },
+                { name: "68010", value: 1 },
+                { name: "68EC020", value: 2, note: "A1200, A2500" }
+            ],
+            menu: "Hardware"
+        },
+        {
+            name: "CPU Speed",
+            key: "CPU.OVERCLOCKING",
+            runtime: true,
+            options: [
+                { name: "1x (7 MHz)", value: 1 },
+                { name: "2x (14 MHz)", value: 2 },
+                { name: "4x (28 MHz)", value: 4 },
+                { name: "8x (56 MHz)", value: 8 }
+            ],
+            menu: "Hardware"
+        },
+        {
+            name: "Agnus Revision",
+            key: "AGNUS.REVISION",
+            runtime: false,
+            options: [
+                { name: "OCS (8367/8361)", value: 0, note: "A1000, A2000A" },
+                { name: "OCS (8371/8370)", value: 1, note: "Early A500, A2000" },
+                { name: "ECS 1MB (8372A)", value: 2, note: "Later A500, A2000" },
+                { name: "ECS 2MB (8375)", value: 3, note: "A500+, A600" }
+            ],
+            menu: "Hardware"
+        },
+        {
+            name: "Denise Revision",
+            key: "DENISE.REVISION",
+            runtime: false,
+            options: [
+                { name: "OCS (8362R8)", value: 0, note: "A500, A1000, A2000" },
+                { name: "ECS (8373R4)", value: 1, note: "A500+, A600" }
+            ],
+            menu: "Hardware"
+        },
+        {
+            name: "CIA Revision",
+            key: "CIA.REVISION",
+            runtime: false,
+            options: [
+                { name: "8520 DIP", value: 0, note: "A500, A1000, A2000, A500+" },
+                { name: "8520 PLCC", value: 1, note: "A600" }
+            ],
+            menu: "Hardware"
+        },
+        {
+            name: "Real-Time Clock",
+            key: "RTC.MODEL",
+            runtime: false,
+            options: [
+                { name: "None", value: 0 },
+                { name: "OKI (MSM6242B)", value: 1, note: "A2000, A500+" },
+                { name: "Ricoh (RF5C01A)", value: 2, note: "A3000, A4000" }
+            ],
+            menu: "Hardware"
+        },
+
+        //
+        // MEMORY (runtime: false - require reset)
+        //
+        {
+            name: "Chip RAM",
+            key: "MEM.CHIP_RAM",
+            runtime: false,
+            options: [
+                { name: "256 KB", value: 256 },
+                { name: "512 KB", value: 512 },
+                { name: "1 MB", value: 1024 },
+                { name: "2 MB", value: 2048 }
+            ],
+            menu: "Memory"
+        },
+        {
+            name: "Slow RAM",
+            key: "MEM.SLOW_RAM",
+            runtime: false,
+            options: [
+                { name: "None", value: 0 },
+                { name: "512 KB", value: 512 },
+                { name: "1 MB", value: 1024 },
+                { name: "1.5 MB", value: 1536 }
+            ],
+            menu: "Memory"
+        },
+        {
+            name: "Fast RAM",
+            key: "MEM.FAST_RAM",
+            runtime: false,
+            options: [
+                { name: "None", value: 0 },
+                { name: "1 MB", value: 1024 },
+                { name: "2 MB", value: 2048 },
+                { name: "4 MB", value: 4096 },
+                { name: "8 MB", value: 8192 }
+            ],
+            menu: "Memory"
+        },
+        {
+            name: "RAM Init Pattern",
+            key: "MEM.RAM_INIT_PATTERN",
+            runtime: false,
+            options: [
+                { name: "All zeroes", value: 0 },
+                { name: "All ones", value: 1 },
+                { name: "Randomized", value: 2 }
+            ],
+            menu: "Memory"
+        },
+
+        //
+        // DRIVES - Disk Insertion (runtime: true - can change while running)
+        //
+        {
+            name: "DF0 Disk",
+            key: "DF0",
+            type: "file",
+            runtime: true,
+            extensions: "adf|adz|dms|img|ima",
+            menu: "Drives"
+        },
+        {
+            name: "DF1 Disk",
+            key: "DF1",
+            type: "file",
+            runtime: true,
+            disabled: true,
+            extensions: "adf|adz|dms|img|ima",
+            menu: "Drives"
+        },
+        {
+            name: "DF2 Disk",
+            key: "DF2",
+            type: "file",
+            runtime: true,
+            disabled: true,
+            extensions: "adf|adz|dms|img|ima",
+            menu: "Drives"
+        },
+        {
+            name: "DF3 Disk",
+            key: "DF3",
+            type: "file",
+            runtime: true,
+            disabled: true,
+            extensions: "adf|adz|dms|img|ima",
+            menu: "Drives"
+        },
+
+        //
+        // INPUT (runtime: true - can change anytime)
+        //
+        {
+            name: "Joystick Autofire",
+            key: "JOY.AUTOFIRE",
+            runtime: true,
+            options: [
+                { name: "Off", value: 0 },
+                { name: "On", value: 1 }
+            ],
+            menu: "Input"
+        },
+        {
+            name: "Autofire Burst Mode",
+            key: "JOY.AUTOFIRE_BURSTS",
+            runtime: true,
+            options: [
+                { name: "Off", value: 0 },
+                { name: "On", value: 1 }
+            ],
+            menu: "Input"
+        },
+        {
+            name: "Autofire Bullets",
+            key: "JOY.AUTOFIRE_BULLETS",
+            runtime: true,
+            slider: { min: 1, max: 10, step: 1 },
+            menu: "Input",
+            note: "Bullets per burst"
+        },
+        {
+            name: "Autofire Delay",
+            key: "JOY.AUTOFIRE_DELAY",
+            runtime: true,
+            slider: { min: 1, max: 20, step: 1 },
+            menu: "Input",
+            note: "Frames between shots"
+        },
+
+        //
+        // PERFORMANCE (runtime: true - can change anytime)
+        //
+        {
+            name: "Warp Mode",
+            key: "AMIGA.WARP_MODE",
+            runtime: true,
+            options: [
+                { name: "Off", value: 0 },
+                { name: "On (Always)", value: 1 },
+                { name: "Auto (Disk access)", value: 2 }
+            ],
+            menu: "Performance"
+        },
+        {
+            name: "Warp Boot",
+            key: "AMIGA.WARP_BOOT",
+            runtime: true,
+            slider: { min: 0, max: 30, step: 1 },
+            menu: "Performance",
+            note: "Seconds to warp on boot"
+        },
+        {
+            name: "VSync",
+            key: "AMIGA.VSYNC",
+            runtime: true,
+            options: [
+                { name: "Off", value: 0 },
+                { name: "On", value: 1 }
+            ],
+            menu: "Performance"
+        },
+        {
+            name: "Speed Boost",
+            key: "AMIGA.SPEED_BOOST",
+            runtime: true,
+            slider: { min: 50, max: 200, step: 10 },
+            menu: "Performance",
+            note: "100 = normal speed"
+        },
+        {
+            name: "Run Ahead",
+            key: "AMIGA.RUN_AHEAD",
+            runtime: true,
+            slider: { min: -4, max: 4, step: 1 },
+            menu: "Performance",
+            note: "Frames (+ahead/-behind)"
+        },
+        {
+            name: "CIA Idle Sleep",
+            key: "CIA.IDLE_SLEEP",
+            runtime: true,
+            options: [
+                { name: "Off", value: 0 },
+                { name: "On", value: 1 }
+            ],
+            menu: "Performance"
+        },
+        {
+            name: "Frame Skipping",
+            key: "DENISE.FRAME_SKIPPING",
+            runtime: true,
+            options: [
+                { name: "Off", value: 0 },
+                { name: "On", value: 16 }
+            ],
+            menu: "Performance"
+        },
+        {
+            name: "Audio Fast Path",
+            key: "AUD.FASTPATH",
+            runtime: true,
+            options: [
+                { name: "Off", value: 0 },
+                { name: "On", value: 1 }
+            ],
+            menu: "Performance"
+        },
+
+        //
+        // COMPATIBILITY (mixed - some runtime, some not)
+        //
+        {
+            name: "Blitter Accuracy",
+            key: "BLITTER.ACCURACY",
+            runtime: true,
+            slider: { min: 0, max: 2, step: 1 },
+            menu: "Compatibility",
+            note: "0=Fast, 2=Cycle-exact"
+        },
+        {
+            name: "Drive Speed",
+            key: "DC.SPEED",
+            runtime: true,
+            options: [
+                { name: "Original", value: 1 },
+                { name: "2x", value: 2 },
+                { name: "4x", value: 4 },
+                { name: "8x", value: 8 },
+                { name: "Unlimited", value: -1 }
+            ],
+            menu: "Compatibility"
+        },
+        {
+            name: "Drive Mechanics",
+            key: "DRIVE.MECHANICS",
+            runtime: true,
+            options: [
+                { name: "Off", value: 0 },
+                { name: "On", value: 1 }
+            ],
+            menu: "Compatibility"
+        },
+        {
+            name: "Lock DSKSYNC",
+            key: "DC.LOCK_DSKSYNC",
+            runtime: true,
+            options: [
+                { name: "Off", value: 0 },
+                { name: "On", value: 1 }
+            ],
+            menu: "Compatibility"
+        },
+        {
+            name: "Auto DSKSYNC",
+            key: "DC.AUTO_DSKSYNC",
+            runtime: true,
+            options: [
+                { name: "Off", value: 0 },
+                { name: "On", value: 1 }
+            ],
+            menu: "Compatibility"
+        },
+        {
+            name: "Accurate Keyboard",
+            key: "KBD.ACCURACY",
+            runtime: true,
+            options: [
+                { name: "Off", value: 0 },
+                { name: "On", value: 1 }
+            ],
+            menu: "Compatibility"
+        },
+        {
+            name: "TOD Bug",
+            key: "CIA.TODBUG",
+            runtime: true,
+            options: [
+                { name: "Off", value: 0 },
+                { name: "On", value: 1 }
+            ],
+            menu: "Compatibility"
+        },
+        {
+            name: "Sprite-Sprite Collision",
+            key: "DENISE.CLX_SPR_SPR",
+            runtime: true,
+            options: [
+                { name: "Off", value: 0 },
+                { name: "On", value: 1 }
+            ],
+            menu: "Compatibility"
+        },
+        {
+            name: "Sprite-Playfield Collision",
+            key: "DENISE.CLX_SPR_PLF",
+            runtime: true,
+            options: [
+                { name: "Off", value: 0 },
+                { name: "On", value: 1 }
+            ],
+            menu: "Compatibility"
+        },
+        {
+            name: "Playfield-Playfield Collision",
+            key: "DENISE.CLX_PLF_PLF",
+            runtime: true,
+            options: [
+                { name: "Off", value: 0 },
+                { name: "On", value: 1 }
+            ],
+            menu: "Compatibility"
+        },
+
+        //
+        // AUDIO (runtime: true - can change anytime)
+        //
+        {
+            name: "Master Volume (Left)",
+            key: "AUD.VOLL",
+            runtime: true,
+            slider: { min: 0, max: 100, step: 5 },
+            menu: "Audio"
+        },
+        {
+            name: "Master Volume (Right)",
+            key: "AUD.VOLR",
+            runtime: true,
+            slider: { min: 0, max: 100, step: 5 },
+            menu: "Audio"
+        },
+        {
+            name: "Channel 0 Volume",
+            key: "AUD.VOL0",
+            runtime: true,
+            slider: { min: 0, max: 100, step: 5 },
+            menu: "Audio"
+        },
+        {
+            name: "Channel 1 Volume",
+            key: "AUD.VOL1",
+            runtime: true,
+            slider: { min: 0, max: 100, step: 5 },
+            menu: "Audio"
+        },
+        {
+            name: "Channel 2 Volume",
+            key: "AUD.VOL2",
+            runtime: true,
+            slider: { min: 0, max: 100, step: 5 },
+            menu: "Audio"
+        },
+        {
+            name: "Channel 3 Volume",
+            key: "AUD.VOL3",
+            runtime: true,
+            slider: { min: 0, max: 100, step: 5 },
+            menu: "Audio"
+        },
+        {
+            name: "Channel 0 Pan",
+            key: "AUD.PAN0",
+            runtime: true,
+            slider: { min: 0, max: 400, step: 50 },
+            menu: "Audio",
+            note: "0=Left, 200=Center, 400=Right"
+        },
+        {
+            name: "Channel 1 Pan",
+            key: "AUD.PAN1",
+            runtime: true,
+            slider: { min: 0, max: 400, step: 50 },
+            menu: "Audio"
+        },
+        {
+            name: "Channel 2 Pan",
+            key: "AUD.PAN2",
+            runtime: true,
+            slider: { min: 0, max: 400, step: 50 },
+            menu: "Audio"
+        },
+        {
+            name: "Channel 3 Pan",
+            key: "AUD.PAN3",
+            runtime: true,
+            slider: { min: 0, max: 400, step: 50 },
+            menu: "Audio"
+        },
+        {
+            name: "Audio Filter",
+            key: "AUD.FILTER_TYPE",
+            runtime: true,
+            options: [
+                { name: "None", value: 0 },
+                { name: "A500 (Butterworth)", value: 1 },
+                { name: "A1200 (Butterworth)", value: 2 }
+            ],
+            menu: "Audio"
+        },
+        {
+            name: "Head Step Volume",
+            key: "DRIVE.STEP_VOLUME",
+            runtime: true,
+            slider: { min: 0, max: 100, step: 10 },
+            menu: "Audio"
+        },
+        {
+            name: "Disk Polling Volume",
+            key: "DRIVE.POLL_VOLUME",
+            runtime: true,
+            slider: { min: 0, max: 100, step: 10 },
+            menu: "Audio"
+        },
+        {
+            name: "Disk Insert Volume",
+            key: "DRIVE.INSERT_VOLUME",
+            runtime: true,
+            slider: { min: 0, max: 100, step: 10 },
+            menu: "Audio"
+        },
+        {
+            name: "Disk Eject Volume",
+            key: "DRIVE.EJECT_VOLUME",
+            runtime: true,
+            slider: { min: 0, max: 100, step: 10 },
+            menu: "Audio"
+        },
+
+        //
+        // VIDEO (runtime: true - can change anytime)
+        //
+        {
+            name: "Color Palette",
+            key: "MON.PALETTE",
+            runtime: true,
+            options: [
+                { name: "RGB (Direct)", value: 0 },
+                { name: "Color", value: 1 },
+                { name: "Black & White", value: 2 },
+                { name: "Paper White", value: 3 },
+                { name: "Green", value: 4 },
+                { name: "Amber", value: 5 },
+                { name: "Sepia", value: 6 }
+            ],
+            menu: "Video"
+        },
+        {
+            name: "Brightness",
+            key: "MON.BRIGHTNESS",
+            runtime: true,
+            slider: { min: 0, max: 100, step: 5 },
+            menu: "Video"
+        },
+        {
+            name: "Contrast",
+            key: "MON.CONTRAST",
+            runtime: true,
+            slider: { min: 0, max: 100, step: 5 },
+            menu: "Video"
+        },
+        {
+            name: "Saturation",
+            key: "MON.SATURATION",
+            runtime: true,
+            slider: { min: 0, max: 100, step: 5 },
+            menu: "Video"
+        },
+        {
+            name: "Blur",
+            key: "MON.BLUR",
+            runtime: true,
+            options: [
+                { name: "Off", value: 0 },
+                { name: "On", value: 1 }
+            ],
+            menu: "Video"
+        },
+        {
+            name: "Blur Radius",
+            key: "MON.BLUR_RADIUS",
+            runtime: true,
+            slider: { min: 0, max: 1000, step: 100 },
+            menu: "Video"
+        },
+        {
+            name: "Bloom",
+            key: "MON.BLOOM",
+            runtime: true,
+            options: [
+                { name: "Off", value: 0 },
+                { name: "On", value: 1 }
+            ],
+            menu: "Video"
+        },
+        {
+            name: "Bloom Brightness",
+            key: "MON.BLOOM_BRIGHTNESS",
+            runtime: true,
+            slider: { min: 0, max: 100, step: 10 },
+            menu: "Video"
+        },
+        {
+            name: "Scanlines",
+            key: "MON.SCANLINES",
+            runtime: true,
+            options: [
+                { name: "None", value: 0 },
+                { name: "Embedded", value: 1 },
+                { name: "Superimposed", value: 2 }
+            ],
+            menu: "Video"
+        },
+        {
+            name: "Scanline Brightness",
+            key: "MON.SCANLINE_BRIGHTNESS",
+            runtime: true,
+            slider: { min: 0, max: 100, step: 10 },
+            menu: "Video"
+        },
+        {
+            name: "Scanline Weight",
+            key: "MON.SCANLINE_WEIGHT",
+            runtime: true,
+            slider: { min: 0, max: 100, step: 10 },
+            menu: "Video"
+        },
+        {
+            name: "Dot Mask",
+            key: "MON.DOTMASK",
+            runtime: true,
+            options: [
+                { name: "None", value: 0 },
+                { name: "Dotted", value: 1 },
+                { name: "Striped", value: 2 },
+                { name: "Aperture Grille", value: 3 }
+            ],
+            menu: "Video"
+        },
+        {
+            name: "Interlace Flicker",
+            key: "MON.FLICKER",
+            runtime: true,
+            options: [
+                { name: "Off", value: 0 },
+                { name: "On", value: 1 }
+            ],
+            menu: "Video"
+        }
+    ]
+}

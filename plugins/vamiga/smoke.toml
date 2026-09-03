@@ -1,0 +1,13 @@
+# The smoke run for this plugin: ./build.sh vamiga --smoke.
+
+# No fixture. hle_rom.c answers enough of AmigaDOS for the machine to come up with no Kickstart
+# present, which is what lets this plugin smoke without shipping or requiring Commodore's ROM.
+
+# Six seconds of the machine's own time, well past the point where it has drawn something.
+frames = 300
+
+# The watchdog, not a budget.
+timeout_seconds = 60
+
+# Not asserted: the shim brings the machine up, it does not play anything.
+audio = false
