@@ -6,6 +6,8 @@
 #   ./build.sh stub --deploy         build, then drop it where the frontend will find it
 #   ./build.sh stub --smoke          build, then run the plugin's smoke (informational)
 #   ./build.sh stub --sdk-dir ~/replay_frontend/build/x64-debug/sdk
+#   ./build.sh stub --docker         build through the pinned toolchain image, as CI does
+#   ./build.sh stub --docker --target aarch64
 #   ./build.sh --list                what is in plugins/
 #
 # Only the named plugins are configured, and only their submodules are initialised, so a
@@ -24,6 +26,9 @@ deploy=0
 smoke=0
 deploy_dir="${REPLAY_SIDELOAD_DIR:-$sideload_default}"
 clean=0
+docker=0
+host_arch="$(uname -m)"
+target="$host_arch"
 
 usage() {
     # The header comment above, up to the first line that is not a comment.
@@ -36,6 +41,8 @@ usage() {
     echo "  --deploy-dir DIR  where --deploy copies to (default \$REPLAY_SIDELOAD_DIR, else $sideload_default)"
     echo "  --smoke           run the plugin's smoke.toml through the smoke host; informational only"
     echo "  --clean           remove the build directory first"
+    echo "  --docker          build inside the pinned toolchain image (docker/IMAGE)"
+    echo "  --target ARCH     the architecture to build for; a foreign one needs --docker"
     echo "  --list            list the plugins in this repository"
 }
 
@@ -53,6 +60,8 @@ while (($#)); do
         --smoke) smoke=1 ;;
         --deploy-dir) deploy_dir="${2:?--deploy-dir needs a path}"; shift ;;
         --clean) clean=1 ;;
+        --docker) docker=1 ;;
+        --target) target="${2:?--target needs an architecture}"; shift ;;
         --list) list_plugins; exit 0 ;;
         -h|--help) usage; exit 0 ;;
         -*) echo "build.sh: unknown option '$1'" >&2; usage >&2; exit 2 ;;
@@ -97,13 +106,76 @@ fi
 
 say() { echo "${marker}$*"; }
 
+# The toolchain image, when --docker asks for it. The build re-enters this script inside the
+# container with the same arguments minus --docker, so there is one build path rather than two,
+# and that is what makes a local build and a CI build the same thing. The repository is always
+# mounted at /src, because -ffile-prefix-map maps the source directory into the artifact: a
+# build from ~/code and a build from a runner's workspace only agree byte for byte if the path
+# the compiler saw was identical.
+if ((docker)); then
+    if ! command -v docker > /dev/null; then
+        echo "build.sh: --docker needs docker, which is not on PATH" >&2
+        exit 2
+    fi
+    if ((deploy)); then
+        echo "build.sh: --deploy has nothing to deploy to inside the container; drop one of them" >&2
+        exit 2
+    fi
+
+    # Both the gate that a tag never reaches a build and the one place the pin is read.
+    image="$(bash "${repo_dir}/scripts/check_image_pin.sh")"
+
+    inner=("${plugins[@]}" "$config" --target "$target")
+    ((clean)) && inner+=(--clean)
+    ((smoke)) && inner+=(--smoke)
+
+    mounts=(-v "${repo_dir}:/src")
+    if [[ -n "$marker" ]]; then
+        mounts+=(-v "${sdk_dir}:/sdk:ro")
+        inner+=(--sdk-dir /sdk)
+    fi
+
+    say "Building through ${image}"
+    # A separate build directory from the bare-host one: a CMake cache records the absolute
+    # paths it was generated with, and the container sees this repository at /src, so the two
+    # would keep invalidating each other's cache if they shared a tree.
+    exec docker run --rm \
+        "${mounts[@]}" \
+        -w /src \
+        -u "$(id -u):$(id -g)" \
+        -e HOME=/tmp \
+        -e REPLAY_BUILD_TAG=docker \
+        "$image" \
+        ./build.sh "${inner[@]}"
+fi
+
 case "$config" in
     debug)   build_type="Debug"   ; asan="OFF" ;;
     release) build_type="Release" ; asan="OFF" ;;
     asan)    build_type="Debug"   ; asan="ON"  ;;
 esac
 
-build_dir="build/${config}"
+# A target that is not this machine's is cross-compiled through a toolchain file, and those
+# only work inside the image, which is where the sysroot they name lives.
+toolchain=()
+build_name="$config"
+if [[ "$target" != "$host_arch" ]]; then
+    toolchain_file="${repo_dir}/cmake/toolchain-${target}.cmake"
+    if [[ ! -f "$toolchain_file" ]]; then
+        echo "build.sh: no cross toolchain for '${target}' (expected ${toolchain_file})" >&2
+        exit 2
+    fi
+    toolchain=(-DCMAKE_TOOLCHAIN_FILE="$toolchain_file")
+    build_name="${target}-${config}"
+    if ((smoke)); then
+        echo "build.sh: --smoke runs the plugin, so it cannot run a ${target} build on ${host_arch}" >&2
+        exit 2
+    fi
+fi
+
+# Set by the --docker branch above, and by nothing else.
+build_dir="build/${REPLAY_BUILD_TAG:+${REPLAY_BUILD_TAG}-}${build_name}"
+
 ((clean)) && rm -rf "$build_dir"
 
 generator=()
@@ -114,9 +186,9 @@ for plugin in "${plugins[@]}"; do
     prepare_upstream "$plugin" || exit 1
 done
 
-say "Configuring ${plugins[*]} (${config}) against ${sdk_dir}"
+say "Configuring ${plugins[*]} (${config}, ${target}) against ${sdk_dir}"
 selected="$(IFS=';'; echo "${plugins[*]}")"
-cmake -S . -B "$build_dir" "${generator[@]}" \
+cmake -S . -B "$build_dir" "${generator[@]}" "${toolchain[@]}" \
     -DCMAKE_BUILD_TYPE="$build_type" \
     -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
     -DREPLAY_SDK_DIR="$sdk_dir" \

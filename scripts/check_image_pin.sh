@@ -1,7 +1,13 @@
 #!/usr/bin/env bash
-# Checks that docker/IMAGE names the toolchain image by digest and nothing else.
+# Checks that docker/IMAGE names the toolchain image by digest and nothing else, and prints
+# the reference it validated.
 #
 #   check_image_pin.sh [<docker/IMAGE>]
+#
+# The validated reference goes to stdout and the human-readable verdict to stderr, so this is
+# both the CI gate and the one place that reads the pin:
+#
+#   image="$(scripts/check_image_pin.sh)"
 #
 # The whole point of the image is that everyone builds with the same compiler, and a tag
 # quietly breaks that: ghcr.io/.../toolchain-linux:latest is a different set of bits on
@@ -50,4 +56,5 @@ if [[ "$digest" =~ ^0+$ ]]; then
     exit 1
 fi
 
-echo "check_image_pin: OK - pinned by digest: $ref"
+echo "check_image_pin: OK - pinned by digest: $ref" >&2
+echo "$ref"

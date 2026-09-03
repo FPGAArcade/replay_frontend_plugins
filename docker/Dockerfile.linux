@@ -21,7 +21,9 @@
 
 FROM rockylinux:8@sha256:9794037624aaa6212aeada1d28861ef5e0a935adaf93e4ef79837119f2a2d04c
 
-# Native x86_64 toolchain, plus clang and lld to drive the cross build.
+# Native x86_64 toolchain, plus clang and lld to drive the cross build, plus the handful of
+# ordinary shell tools a build reaches for - an emulator upstream's CMakeLists, and the SDK's
+# own plugin audit, both assume find, make and patch are simply there.
 RUN dnf -y install epel-release 'dnf-command(config-manager)' \
     && dnf -y install \
         gcc-toolset-13-gcc \
@@ -32,8 +34,13 @@ RUN dnf -y install epel-release 'dnf-command(config-manager)' \
         python3.11 \
         python3.11-pip \
         git \
+        make \
+        patch \
         binutils \
         file \
+        findutils \
+        diffutils \
+        which \
         util-linux \
     && dnf clean all
 
