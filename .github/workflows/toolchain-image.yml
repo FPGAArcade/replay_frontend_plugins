@@ -1,0 +1,66 @@
+# Publishes the toolchain image every plugin here is built with.
+#
+# The image is not rebuilt on every push: Rocky 8's repositories roll forward under the pinned
+# base image, so two builds of the same Dockerfile months apart are two different images. It is
+# built when docker/ changes or when someone asks for it, and the digest it prints then goes
+# into docker/IMAGE by hand. That edit is what moves CI and every contributor at once, and it
+# is deliberately a human step - a workflow that wrote the pin itself would let the compiler
+# change without anyone reviewing it.
+#
+# The package is public even though this repository is not, because an outside plugin author
+# has to be able to pull the same digest CI uses. Visibility is a one-off setting on the
+# package in GitHub's UI; a package first pushed from a private repository starts private.
+name: Toolchain image
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - docker/**
+      - .github/workflows/toolchain-image.yml
+
+env:
+  IMAGE: ghcr.io/fpgaarcade/replay_frontend_plugins/toolchain-linux
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # One image, not a per-architecture matrix: aarch64 is cross-compiled from inside this
+      # x86_64 image against the sysroot baked into it, so there is nothing to build natively
+      # on an arm64 runner and nothing to stitch a manifest from.
+      - name: Build and push
+        run: |
+          docker build \
+            --label org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }} \
+            -f docker/Dockerfile.linux \
+            -t "$IMAGE:${{ github.sha }}" \
+            -t "$IMAGE:latest" \
+            docker
+          docker push "$IMAGE:${{ github.sha }}"
+          docker push "$IMAGE:latest"
+
+      - name: Print the digest to pin
+        run: |
+          digest="$(docker buildx imagetools inspect "$IMAGE:${{ github.sha }}" --format '{{ .Manifest.Digest }}')"
+          {
+              echo "## Pin this in \`docker/IMAGE\`"
+              echo
+              echo '```'
+              echo "${IMAGE}@${digest}"
+              echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

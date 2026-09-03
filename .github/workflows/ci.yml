@@ -1,0 +1,85 @@
+# What has to hold before anything from this repository is published.
+#
+# Every build here goes through ./build.sh --docker, which is the same command a contributor
+# runs. That is deliberate: the way a "works in CI" and a "works on my machine" diverge is by
+# being two different scripts, so there is one, and the pinned digest in docker/IMAGE makes it
+# the same compiler on both sides.
+#
+# Only plugins/stub is built. It exercises the whole path - the image, both targets, the SDK's
+# import audit and the ABI floor - in under a minute, where the emulator plugins are hundreds
+# of megabytes of upstream each. Adding them is a question of what a runner's time is worth,
+# not of coverage of anything this checks.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  checks:
+    name: Repository checks
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # A tag here would let CI and a contributor build with different compilers while both
+      # looked correct, so it is refused before anything is built.
+      - name: The toolchain image is pinned by digest
+        run: ./scripts/check_image_pin.sh
+
+      - name: The smoke host's own tests
+        run: ./smoke/selftest.sh
+
+      - name: prepare_upstream's own tests
+        run: ./scripts/upstream_selftest.sh
+
+  build:
+    name: Build (${{ matrix.target }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [x86_64, aarch64]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build through the pinned image
+        run: ./build.sh stub release --docker --target ${{ matrix.target }}
+
+      # glibc floor, no dynamically linked C++ runtime, and nothing exported but the entry
+      # point. The build being green says none of that; this does.
+      - name: Audit the artifact
+        run: |
+          if [ "${{ matrix.target }}" = x86_64 ]; then
+              build=build/docker-release
+          else
+              build=build/docker-${{ matrix.target }}-release
+          fi
+          ./scripts/check_abi_floor.sh "$build/plugins/stub/stub.so"
+
+      # The one thing that differs between this runner and a contributor's machine is where the
+      # checkout sits, and -ffile-prefix-map is what has to absorb that. Building the same
+      # commit from a second path and comparing the bytes is the check that it does.
+      - name: The artifact does not depend on where it was built
+        run: |
+          if [ "${{ matrix.target }}" = x86_64 ]; then
+              build=build/docker-release
+          else
+              build=build/docker-${{ matrix.target }}-release
+          fi
+          elsewhere="${RUNNER_TEMP}/a-different-path"
+          git clone --recurse-submodules --shared . "$elsewhere"
+          (cd "$elsewhere" && ./build.sh stub release --docker --target ${{ matrix.target }})
+          here="$(sha256sum "$build/plugins/stub/stub.so" | cut -d' ' -f1)"
+          there="$(sha256sum "$elsewhere/$build/plugins/stub/stub.so" | cut -d' ' -f1)"
+          echo "$here  this checkout"
+          echo "$there  $elsewhere"
+          if [ "$here" != "$there" ]; then
+              echo "The same commit built two different artifacts depending on its path." >&2
+              exit 1
+          fi
