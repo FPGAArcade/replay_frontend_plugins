@@ -1,0 +1,14 @@
+# The toolchain image, pinned by digest. This file is the single source of truth for it:
+# ./build.sh --docker reads it, and so does the CI workflow. Neither is allowed to name the
+# image any other way, which is what keeps a contributor's build and a release build on
+# identical bits.
+#
+# A tag is not acceptable here and scripts/check_image_pin.sh enforces that. Tags move; a
+# release built six months ago must still be rebuildable with the compiler it actually
+# shipped with, and only a digest gives that.
+#
+# To change the toolchain: edit docker/Dockerfile.linux, let the toolchain-image workflow
+# publish it, and replace the line below with the digest it prints. That single edit is what
+# moves every consumer at once.
+
+ghcr.io/fpgaarcade/replay_frontend_plugins/toolchain-linux@sha256:0000000000000000000000000000000000000000000000000000000000000000

@@ -23,6 +23,9 @@ endif()
 
 include("${REPLAY_SDK_DIR}/cmake/ReplaySDK.cmake")
 
+# The settings every published plugin is built with; see the file for what and why.
+include("${CMAKE_CURRENT_LIST_DIR}/ReplayRelease.cmake")
+
 if(REPLAY_PLUGIN_ASAN)
     add_compile_options(-fsanitize=address -fno-omit-frame-pointer)
     add_link_options(-fsanitize=address)

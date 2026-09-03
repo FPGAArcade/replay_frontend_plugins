@@ -1,0 +1,65 @@
+# The toolchain image every published plugin is built with, and the one a plugin author gets
+# from ./build.sh --docker. Both read the same digest, so what a contributor builds on their
+# laptop is what the release pipeline builds on the runners.
+#
+# Rocky 8 is here for its libc. Linking against glibc 2.28 makes every versioned symbol
+# reference in the result <= 2.28 by construction, which is what lets a plugin run on the
+# Debian 12 device and on older hosts alike; the symbol audit then proves it rather than
+# trusting it. gcc-toolset-13 supplies a modern compiler on top of that old libc, and its
+# libstdc++ is linked statically with hidden symbols because the device's runtime is GCC 12's
+# and would not satisfy a dynamic reference to it.
+#
+# arm64 is cross-compiled, not emulated: clang drives it against a Rocky 8 aarch64 sysroot
+# built into the image below. The device sysroot the frontend uses is deliberately NOT that
+# sysroot - it is Debian 12, and building against it would quietly raise the arm64 floor to
+# glibc 2.36 while every check here still passed.
+#
+# Note that this file is not itself the reproducibility guarantee. The Rocky 8 repositories
+# roll forward under the pinned base image, so building it twice months apart yields two
+# different images. The published digest is what pins users and CI to identical bits, which
+# is why changing anything here means republishing and bumping docker/IMAGE.
+
+FROM rockylinux:8@sha256:9794037624aaa6212aeada1d28861ef5e0a935adaf93e4ef79837119f2a2d04c
+
+# Native x86_64 toolchain, plus clang and lld to drive the cross build.
+RUN dnf -y install epel-release 'dnf-command(config-manager)' \
+    && dnf -y install \
+        gcc-toolset-13-gcc \
+        gcc-toolset-13-gcc-c++ \
+        clang \
+        lld \
+        cmake \
+        python3.11 \
+        python3.11-pip \
+        git \
+        binutils \
+        file \
+        util-linux \
+    && dnf clean all
+
+RUN python3.11 -m pip install --no-cache-dir ninja==1.11.1.1
+
+# The aarch64 sysroot: the same package set as the native side, for the other architecture.
+# --forcearch installs aarch64 packages on an x86_64 host, so what lands here is headers,
+# libc and a matching libstdc++.a. The compiler binaries in gcc-toolset-13-gcc-c++ are
+# aarch64 executables and cannot run here - clang is the compiler, and this tree is only
+# what it compiles and links against.
+ARG SYSROOT=/sysroots/rocky8-aarch64
+RUN dnf -y \
+        --forcearch=aarch64 \
+        --installroot="${SYSROOT}" \
+        --releasever=8 \
+        --setopt=install_weak_deps=False \
+        install \
+            rocky-repos \
+            rocky-gpg-keys \
+            glibc-devel \
+            kernel-headers \
+            gcc-toolset-13-gcc-c++ \
+            gcc-toolset-13-libstdc++-devel \
+    && dnf --installroot="${SYSROOT}" clean all \
+    && rm -rf "${SYSROOT}/var/cache/dnf"
+
+ENV PATH="/opt/rh/gcc-toolset-13/root/usr/bin:${PATH}" \
+    REPLAY_AARCH64_SYSROOT=/sysroots/rocky8-aarch64 \
+    REPLAY_AARCH64_GCC_TOOLCHAIN=/sysroots/rocky8-aarch64/opt/rh/gcc-toolset-13/root/usr
