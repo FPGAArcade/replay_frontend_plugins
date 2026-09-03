@@ -51,12 +51,29 @@ RUN python3.11 -m pip install --no-cache-dir ninja==1.11.1.1
 # libc and a matching libstdc++.a. The compiler binaries in gcc-toolset-13-gcc-c++ are
 # aarch64 executables and cannot run here - clang is the compiler, and this tree is only
 # what it compiles and links against.
+#
+# noscripts because a package's scriptlets are aarch64 too, and running them means running a
+# foreign binary. A machine with qemu-aarch64 registered in binfmt_misc will do that quite
+# happily and one without it fails the install, so leaving them enabled makes the image depend
+# on a kernel registration outside the build. Nothing here needs them: they cache and register
+# things for a system that will run this tree, and nothing ever runs this tree.
+#
+# The one scriptlet that did something structural was the filesystem package's, which lays out
+# the /lib -> usr/lib symlinks Rocky 8 puts everything under. Without it rpm finds a directory
+# where the package carries a symlink and the transaction fails, so the four are made here
+# first and the install goes through them.
 ARG SYSROOT=/sysroots/rocky8-aarch64
-RUN dnf -y \
+RUN mkdir -p "${SYSROOT}/usr/bin" "${SYSROOT}/usr/sbin" "${SYSROOT}/usr/lib" "${SYSROOT}/usr/lib64" \
+    && ln -s usr/bin "${SYSROOT}/bin" \
+    && ln -s usr/sbin "${SYSROOT}/sbin" \
+    && ln -s usr/lib "${SYSROOT}/lib" \
+    && ln -s usr/lib64 "${SYSROOT}/lib64" \
+    && dnf -y \
         --forcearch=aarch64 \
         --installroot="${SYSROOT}" \
         --releasever=8 \
         --setopt=install_weak_deps=False \
+        --setopt=tsflags=noscripts \
         install \
             rocky-repos \
             rocky-gpg-keys \
