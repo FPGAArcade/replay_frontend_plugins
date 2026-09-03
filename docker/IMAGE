@@ -11,4 +11,4 @@
 # publish it, and replace the line below with the digest it prints. That single edit is what
 # moves every consumer at once.
 
-ghcr.io/fpgaarcade/replay_frontend_plugins/toolchain-linux@sha256:0000000000000000000000000000000000000000000000000000000000000000
+ghcr.io/fpgaarcade/replay_frontend_plugins/toolchain-linux@sha256:73a3a772cf145c9b680b80011eeebc0a9718e5b4ac51b7306f93297a1c984c72

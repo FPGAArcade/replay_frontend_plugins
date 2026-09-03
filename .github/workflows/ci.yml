@@ -16,6 +16,13 @@ on:
     branches: [main]
   pull_request:
 
+# To pull the toolchain image. Needed only while the package is private: the point of hosting
+# it publicly is that an outside plugin author pulls the same digest with no credentials at
+# all, and when it is public this and the login step below both come out.
+permissions:
+  contents: read
+  packages: read
+
 jobs:
   checks:
     name: Repository checks
@@ -43,6 +50,13 @@ jobs:
         target: [x86_64, aarch64]
     steps:
       - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build through the pinned image
         run: ./build.sh stub release --docker --target ${{ matrix.target }}
