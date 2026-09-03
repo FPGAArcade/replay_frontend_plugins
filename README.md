@@ -72,9 +72,22 @@ plugins/<name>/
 `plugins/stub` is the reference: the smallest thing that builds, deploys and launches. It has no
 upstream, so it carries neither `upstream/` nor `patches/`.
 
-A real emulator is never copied into this repository. It arrives as a submodule of its *original*
-upstream pinned at a commit, with our changes as a patch series beside it, so provenance stays
-honest and this repository's history stays small. `./build.sh` initialises those submodules
+**A port stays faithful to the source it came from.** Glue moved here from the frontend keeps
+upstream's spelling -- `NULL`, `uint32_t`, `float` -- rather than being converted to this project's
+`nullptr` and `u32`/`f32` aliases, and its comments are left alone. The only changes a port carries
+are the ones it needs to build here: the include block the SDK's include root requires, and
+whatever the plugin boundary genuinely demands. The reason is auditability -- a port that is a move
+can be checked against its original with a single `diff`, and one carrying incidental cleanup
+cannot. The convention applies in full to code written here, `plugins/stub` included, so the
+reference plugin and a ported one do read differently on purpose.
+
+A real emulator normally arrives as a submodule of its *original* upstream pinned at a commit, with
+our changes as a patch series beside it, so provenance stays honest and this repository's history
+stays small. The exception is an upstream that is both small and pristine: Mesen2 is carried
+in-tree, because at 10 MB with no changes against it there is no series for a pin to reproduce and
+nothing for the indirection to buy. An upstream we patch, or a large one, is always a submodule --
+ScummVM and vAmiga are hundreds of megabytes, and copying those in would put the bytes in this
+repository's history permanently. `./build.sh` initialises those submodules
 shallowly (`--depth 1`) and only for the plugins being built, then applies that plugin's
 `patches/*.patch` in filename order. Both halves are idempotent, so building again does neither
 twice, and together they mean the pin plus the series reproduce the exact source that builds.
