@@ -21,6 +21,7 @@
 #include <signal.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -245,6 +246,20 @@ static bool run_frames(const RpEmuAPI* api, void* instance, const SmokeConfig* c
         }
         blank_final_frame = framebuffer_is_blank(&ctx, &geometry);
         heard_audio = heard_audio || audio_has_signal(&ctx, &audio);
+
+        // Wait out the frame the plugin says it just produced. A core that steps its emulation
+        // inside run_frame does not need this, but one that runs free on its own thread does:
+        // for that kind, run_frame samples whatever the emulation has reached rather than
+        // advancing it, so a loop that never waits samples the same power-on black screen a
+        // thousand times and reports it as a blank framebuffer. Waiting makes `frames` mean
+        // frames of the machine's time either way.
+        if (delta_time > 0.0) {
+            const struct timespec frame_time = {
+                .tv_sec = (time_t)delta_time,
+                .tv_nsec = (long)((delta_time - (double)(time_t)delta_time) * 1e9),
+            };
+            nanosleep(&frame_time, nullptr);
+        }
     }
 
     printf("smoke: ran %u frames at %ux%u\n", config->frames, video.width, video.height);
