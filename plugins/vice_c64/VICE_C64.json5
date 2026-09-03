@@ -1,0 +1,241 @@
+// VICE C64 - Commodore 64 emulator core
+// Based on vice-libretro
+name: "VICE_C64",
+plugin: "vice_c64.so",
+
+metadata: {
+    shortname: "VICE",
+    fullname: "Commodore 64 (VICE)",
+    manufacturer: "Commodore",
+    year: "1982",
+    info: "VICE (Versatile Commodore Emulator) is a cross-platform emulator for the C64, C128, VIC-20, and other Commodore computers. This core focuses on C64 emulation with accurate SID sound chip emulation via ReSID.",
+    tags: ["Computer", "C64", "Commodore", "MOS", "6510", "SID"],
+    icon: ""
+},
+
+extensions: ["d64", "d71", "d80", "d81", "d82", "g64", "g41", "x64", "t64", "tap", "prg", "p00", "crt", "bin", "m3u", "vsf", "nib", "nbz"],
+
+// The C64 ROMs are not shipped: they are Commodore's copyrighted code and this project has no
+// right to redistribute them. The user supplies them, and the sizes and hashes below are what a
+// correct set looks like. See README.md beside this file.
+bios: {
+    directory: "c64",
+    files: [
+        {
+            name: "kernal-901227-03.bin",
+            description: "C64 KERNAL ROM, revision 3",
+            size: 8192,
+            sha256: "83c60d47047d7beab8e5b7bf6f67f80daa088b7a6a27de0d7e016f6484042721",
+            required: true
+        },
+        {
+            name: "basic-901226-01.bin",
+            description: "C64 BASIC V2 ROM",
+            size: 8192,
+            sha256: "89878cea0a268734696de11c4bae593eaaa506465d2029d619c0e0cbccdfa62d",
+            required: true
+        },
+        {
+            name: "chargen-901225-01.bin",
+            description: "C64 character generator ROM",
+            size: 4096,
+            sha256: "fd0d53b8480e86163ac98998976c72cc58d5dd8eb824ed7b829774e74213b420",
+            required: true
+        }
+    ]
+},
+
+// Drive configuration
+drives: {
+    floppy: [
+        { id: "drive8", name: "Drive 8", description: "Primary disk drive", connected: true, extensions: ["d64", "d71", "d80", "d81", "d82", "g64", "g41", "x64", "nib", "nbz"] },
+        { id: "drive9", name: "Drive 9", description: "Secondary disk drive", connected: false, extensions: ["d64", "d71", "d80", "d81", "d82", "g64", "g41", "x64", "nib", "nbz"] },
+        { id: "drive10", name: "Drive 10", description: "Additional disk drive", connected: false, extensions: ["d64", "d71", "d80", "d81", "d82", "g64", "g41", "x64", "nib", "nbz"] },
+        { id: "drive11", name: "Drive 11", description: "Additional disk drive", connected: false, extensions: ["d64", "d71", "d80", "d81", "d82", "g64", "g41", "x64", "nib", "nbz"] }
+    ],
+    tape: [
+        { id: "datasette", name: "Datasette", description: "Commodore Datasette tape drive", connected: true, extensions: ["t64", "tap"] }
+    ],
+    cartridge: [
+        { id: "cartridge", name: "Cartridge", description: "ROM cartridge slot", connected: false, extensions: ["crt", "bin"] }
+    ]
+},
+
+// OSD Actions
+actions: [
+    { id: "soft_reset", name: "Soft Reset", description: "Reset the C64", menu: "System" },
+    { id: "hard_reset", name: "Hard Reset", description: "Power cycle the C64", menu: "System" },
+    { id: "save_state", name: "Save State", description: "Save current emulator state", menu: "State" },
+    { id: "load_state", name: "Load State", description: "Load previously saved state", menu: "State" }
+],
+
+// Core configuration options
+config: {
+    default: 0,
+
+    options: [
+        //
+        // HARDWARE (runtime: false - require reset)
+        //
+        {
+            name: "Video Standard",
+            key: "REGION",
+            runtime: false,
+            options: [
+                { name: "PAL", value: 0 },
+                { name: "NTSC", value: 1 }
+            ],
+            menu: "Hardware"
+        },
+        {
+            name: "C64 Model",
+            key: "MODEL",
+            runtime: false,
+            options: [
+                { name: "C64 PAL", value: 0 },
+                { name: "C64C PAL", value: 1 },
+                { name: "C64 Old PAL", value: 2 },
+                { name: "C64 NTSC", value: 3 },
+                { name: "C64C NTSC", value: 4 },
+                { name: "C64 Old NTSC", value: 5 }
+            ],
+            menu: "Hardware"
+        },
+
+        //
+        // AUDIO (runtime: true - can change anytime)
+        //
+        {
+            name: "SID Model",
+            key: "SID_MODEL",
+            runtime: true,
+            options: [
+                { name: "6581 (Original)", value: 0, note: "Original SID chip" },
+                { name: "8580 (C64C)", value: 1, note: "Later revision" }
+            ],
+            menu: "Audio"
+        },
+        {
+            name: "SID Filter",
+            key: "SID_FILTER",
+            runtime: true,
+            options: [
+                { name: "On", value: 1 },
+                { name: "Off", value: 0 }
+            ],
+            menu: "Audio"
+        },
+        {
+            name: "ReSID Sampling",
+            key: "RESID_SAMPLING",
+            runtime: true,
+            options: [
+                { name: "Fast", value: 0 },
+                { name: "Interpolating", value: 1 },
+                { name: "Resampling", value: 2, note: "Best quality" }
+            ],
+            menu: "Audio"
+        },
+
+        //
+        // DRIVES (runtime: false - require reset)
+        //
+        {
+            name: "Drive 8 Type",
+            key: "DRIVE8TYPE",
+            runtime: false,
+            options: [
+                { name: "1541", value: 0, note: "Standard disk drive" },
+                { name: "1541-II", value: 1 },
+                { name: "1571", value: 2, note: "Double-sided" },
+                { name: "1581", value: 3, note: "3.5\" drive" }
+            ],
+            menu: "Drives"
+        },
+        {
+            name: "Drive 8 Sound Emulation",
+            key: "DRIVE8SOUND",
+            runtime: true,
+            options: [
+                { name: "Off", value: 0 },
+                { name: "On", value: 1 }
+            ],
+            menu: "Drives"
+        },
+        {
+            name: "True Drive Emulation",
+            key: "TRUEDRIVE",
+            runtime: false,
+            options: [
+                { name: "On", value: 1, note: "Accurate but slower" },
+                { name: "Off", value: 0, note: "Faster loading" }
+            ],
+            menu: "Drives"
+        },
+
+        //
+        // VIDEO (runtime: true - can change anytime)
+        //
+        {
+            name: "VIC-II Borders",
+            key: "BORDERS",
+            runtime: true,
+            options: [
+                { name: "Full", value: 0 },
+                { name: "Normal", value: 1 },
+                { name: "Small", value: 2 },
+                { name: "None", value: 3 }
+            ],
+            menu: "Video"
+        },
+        {
+            name: "Aspect Ratio",
+            key: "ASPECT",
+            runtime: true,
+            options: [
+                { name: "Auto", value: 0 },
+                { name: "PAL", value: 1 },
+                { name: "NTSC", value: 2 }
+            ],
+            menu: "Video"
+        },
+
+        //
+        // INPUT (runtime: true - can change anytime)
+        //
+        {
+            name: "Joystick Port",
+            key: "JOYPORT",
+            runtime: true,
+            options: [
+                { name: "Port 2", value: 2, note: "Most common" },
+                { name: "Port 1", value: 1 }
+            ],
+            menu: "Input"
+        },
+        {
+            name: "Autofire",
+            key: "AUTOFIRE",
+            runtime: true,
+            options: [
+                { name: "Off", value: 0 },
+                { name: "On", value: 1 }
+            ],
+            menu: "Input"
+        },
+
+        //
+        // PERFORMANCE (runtime: true - can change anytime)
+        //
+        {
+            name: "Warp Mode",
+            key: "WARP",
+            runtime: true,
+            options: [
+                { name: "Off", value: 0 },
+                { name: "On", value: 1, note: "Maximum speed" }
+            ],
+            menu: "Performance"
+        }
+    ]
+}
