@@ -14,7 +14,7 @@ only thing crossing between them, and the pin lives on this side.
 ./build.sh stub release         # release
 ./build.sh stub asan            # debug + AddressSanitizer
 ./build.sh stub --deploy        # build, then install it where the frontend looks
-./build.sh hatari               # a real emulator: fetches its upstream, then builds it
+./build.sh mesen2_nes           # a real emulator core
 ./build.sh --list               # what is here
 ```
 
@@ -80,8 +80,9 @@ shallowly (`--depth 1`) and only for the plugins being built, then applies that 
 twice, and together they mean the pin plus the series reproduce the exact source that builds.
 
 A change to an emulator's own source is added as a numbered patch (`git format-patch` output,
-`0001-...`), never committed into `upstream/`. `plugins/hatari` is the worked example: it pins
-hatariB and its series is empty, because hatariB needs no changes to build against the SDK.
+`0001-...`), never committed into `upstream/`. No plugin here uses this yet -- Mesen2 is carried
+in-tree because it is small and we have no changes against it -- but ScummVM and vAmiga will, and
+their series are what the pin has to reproduce.
 
 ## Smoke
 
@@ -107,13 +108,12 @@ audio = true                     # also assert the plugin produced audio (option
 
 A machine that comes up on its own ROM with an empty drive omits `fixture` entirely. The host then
 mounts nothing -- the plugin is handed a null path -- and asserts against the screen the machine
-reaches by itself. `plugins/hatari` is the example: hatariB compiles EmuTOS in, so its smoke boots
-to the EmuTOS desktop with no file to ship and nothing to license.
+reaches by itself. A console needs a cartridge to show anything, so the Mesen2 plugins all name a
+fixture; a home computer that boots to its own prompt would not.
 
 `frames` has to run past the whole boot, not just the first picture. A machine typically draws a
-boot screen, blanks while it clears for the desktop, and only then settles -- hatari is non-blank
-by frame 450, blank from about 500 to 750, and settled from 800 -- so a count chosen just past the
-first picture lands in the gap and fails.
+boot screen, blanks while it clears, and only then settles, so a count chosen just past the first
+picture lands in the gap and fails.
 
 Every fixture needs a `<fixture>.provenance.toml` beside it, and a run whose fixture has none
 fails:
@@ -169,7 +169,6 @@ be switched to by hand if an upstream went away.
 
 | Plugin | Upstream |
 |--------|----------|
-| hatari | https://github.com/bbbradsmith/hatariB |
 | mesen2 | https://github.com/SourMesen/Mesen2 |
 | scummvm | https://github.com/scummvm/scummvm |
 | vamiga | https://github.com/dirkwhoffmann/vAmiga |
