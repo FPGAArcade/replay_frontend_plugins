@@ -1,0 +1,41 @@
+// Mesen2 PCE - Cycle-accurate PC Engine/TurboGrafx-16 emulator core
+name: "Mesen2_PCE",
+plugin: "mesen2_pce.so",
+
+metadata: {
+    shortname: "Mesen2",
+    fullname: "NEC PC Engine (Mesen2)",
+    manufacturer: "NEC",
+    year: "1987",
+    info: "Mesen2 is a highly accurate PC Engine/TurboGrafx-16 emulator by Sour. It provides cycle-perfect emulation of the HuC6280-based hardware.",
+    tags: ["Console", "PC Engine", "TurboGrafx-16", "NEC", "8-bit", "HuC6280"],
+    icon: ""
+},
+
+extensions: ["pce", "sgx", "cue"],
+
+bios: {
+    directory: "pce",
+    files: [
+        {
+            name: "syscard3.pce",
+            description: "PC Engine CD System Card 3.0",
+            size: 262144,
+            sha256: "38179df8f4ac870017db21ebcbf53114a7c5f3a7e951c4f8b tried8f47ce81f0bc7c",
+            required: false,
+            note: "Required for CD-ROM games"
+        }
+    ]
+},
+
+actions: [
+    { id: "soft_reset", name: "Reset", description: "Reset the PC Engine", menu: "System" },
+    { id: "hard_reset", name: "Power Cycle", description: "Power cycle the PC Engine", menu: "System" },
+    { id: "save_state", name: "Save State", description: "Save current emulator state", menu: "State" },
+    { id: "load_state", name: "Load State", description: "Load previously saved state", menu: "State" }
+],
+
+config: {
+    default: 0,
+    options: []
+}

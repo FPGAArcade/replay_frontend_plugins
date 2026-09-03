@@ -1,0 +1,41 @@
+// Mesen2 GBA - Cycle-accurate Game Boy Advance emulator core
+name: "Mesen2_GBA",
+plugin: "mesen2_gba.so",
+
+metadata: {
+    shortname: "Mesen2",
+    fullname: "Nintendo Game Boy Advance (Mesen2)",
+    manufacturer: "Nintendo",
+    year: "2001",
+    info: "Mesen2 is a highly accurate Game Boy Advance emulator by Sour. It provides cycle-perfect emulation of the ARM7TDMI-based GBA hardware.",
+    tags: ["Handheld", "GBA", "Nintendo", "32-bit", "ARM7"],
+    icon: ""
+},
+
+extensions: ["gba"],
+
+bios: {
+    directory: "gba",
+    files: [
+        {
+            name: "gba_bios.bin",
+            description: "Game Boy Advance BIOS",
+            size: 16384,
+            sha256: "fd2547724b505f487e6dcb29ec2ecff3af35a841a77ab2e85fd87350abd36570",
+            required: false,
+            note: "Optional but recommended for best compatibility"
+        }
+    ]
+},
+
+actions: [
+    { id: "soft_reset", name: "Reset", description: "Reset the GBA", menu: "System" },
+    { id: "hard_reset", name: "Power Cycle", description: "Power cycle the GBA", menu: "System" },
+    { id: "save_state", name: "Save State", description: "Save current emulator state", menu: "State" },
+    { id: "load_state", name: "Load State", description: "Load previously saved state", menu: "State" }
+],
+
+config: {
+    default: 0,
+    options: []
+}

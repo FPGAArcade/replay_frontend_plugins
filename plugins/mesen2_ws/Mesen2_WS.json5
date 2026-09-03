@@ -1,0 +1,55 @@
+// Mesen2 WS - Cycle-accurate WonderSwan/WonderSwan Color emulator core
+name: "Mesen2_WS",
+plugin: "mesen2_ws.so",
+
+metadata: {
+    shortname: "Mesen2",
+    fullname: "Bandai WonderSwan (Mesen2)",
+    manufacturer: "Bandai",
+    year: "1999",
+    info: "Mesen2 is a highly accurate WonderSwan and WonderSwan Color emulator by Sour. It provides cycle-perfect emulation of the V30MZ-based hardware.",
+    tags: ["Handheld", "WonderSwan", "Bandai", "16-bit", "V30MZ"],
+    icon: ""
+},
+
+extensions: ["ws", "wsc"],
+
+bios: {
+    directory: "ws",
+    files: [
+        {
+            name: "ws_boot.rom",
+            description: "WonderSwan Boot ROM",
+            size: 4096,
+            sha256: "a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1",
+            required: false,
+            note: "Optional - enables boot animation"
+        }
+    ]
+},
+
+actions: [
+    { id: "soft_reset", name: "Reset", description: "Reset the WonderSwan", menu: "System" },
+    { id: "hard_reset", name: "Power Cycle", description: "Power cycle the WonderSwan", menu: "System" },
+    { id: "save_state", name: "Save State", description: "Save current emulator state", menu: "State" },
+    { id: "load_state", name: "Load State", description: "Load previously saved state", menu: "State" }
+],
+
+config: {
+    default: 0,
+    options: [
+        {
+            name: "System Type",
+            key: "WS_MODEL",
+            type: "enum",
+            values: [
+                { id: 0, name: "Auto" },
+                { id: 1, name: "WonderSwan" },
+                { id: 2, name: "WonderSwan Color" }
+            ],
+            default: 0,
+            runtime: false,
+            menu: "Hardware"
+        }
+    ]
+}

@@ -1,0 +1,56 @@
+// Mesen2 SMS - Cycle-accurate Sega Master System/Game Gear emulator core
+name: "Mesen2_SMS",
+plugin: "mesen2_sms.so",
+
+metadata: {
+    shortname: "Mesen2",
+    fullname: "Sega Master System (Mesen2)",
+    manufacturer: "Sega",
+    year: "1985",
+    info: "Mesen2 is a highly accurate Sega Master System and Game Gear emulator by Sour. It provides cycle-perfect emulation of the Z80-based hardware.",
+    tags: ["Console", "Master System", "Game Gear", "Sega", "8-bit", "Z80"],
+    icon: ""
+},
+
+extensions: ["sms", "gg", "sg"],
+
+bios: {
+    directory: "sms",
+    files: [
+        {
+            name: "bios.sms",
+            description: "Master System BIOS",
+            size: 8192,
+            sha256: "0072ed54b0e86dc4c6df8c656d8af88e8c2c0e4d1a1f6b3c7d8e9f0a1b2c3d4e",
+            required: false,
+            note: "Optional - some games require it"
+        }
+    ]
+},
+
+actions: [
+    { id: "soft_reset", name: "Reset", description: "Reset the Master System", menu: "System" },
+    { id: "hard_reset", name: "Power Cycle", description: "Power cycle the Master System", menu: "System" },
+    { id: "save_state", name: "Save State", description: "Save current emulator state", menu: "State" },
+    { id: "load_state", name: "Load State", description: "Load previously saved state", menu: "State" }
+],
+
+config: {
+    default: 0,
+    options: [
+        {
+            name: "System Type",
+            key: "SMS_MODEL",
+            type: "enum",
+            values: [
+                { id: 0, name: "Auto" },
+                { id: 1, name: "Master System" },
+                { id: 2, name: "Game Gear" },
+                { id: 3, name: "SG-1000" }
+            ],
+            default: 0,
+            runtime: false,
+            menu: "Hardware"
+        }
+    ]
+}

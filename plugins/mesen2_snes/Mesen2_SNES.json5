@@ -1,0 +1,169 @@
+// Mesen2 SNES - Cycle-accurate SNES emulator core
+name: "Mesen2_SNES",
+plugin: "mesen2_snes.so",
+
+metadata: {
+    shortname: "Mesen2",
+    fullname: "Super Nintendo Entertainment System (Mesen2)",
+    manufacturer: "Nintendo",
+    year: "1990",
+    info: "Mesen2 is a highly accurate SNES emulator by Sour. It supports all licensed games with cycle-perfect emulation including enhancement chips (DSP, SuperFX, SA-1, etc.).",
+    tags: ["Console", "SNES", "Super Famicom", "Nintendo", "16-bit", "65816"],
+    icon: ""
+},
+
+extensions: ["sfc", "swc", "fig", "smc", "bs", "spc"],
+
+bios: {
+    directory: "snes",
+    files: [
+        {
+            name: "dsp1.rom",
+            description: "DSP-1 Co-processor BIOS",
+            size: 8192,
+            required: false,
+            note: "Required for games using DSP-1 chip (Pilotwings, Super Mario Kart, etc.)"
+        },
+        {
+            name: "dsp1b.rom",
+            description: "DSP-1B Co-processor BIOS",
+            size: 8192,
+            required: false,
+            note: "Required for games using DSP-1B chip"
+        },
+        {
+            name: "dsp2.rom",
+            description: "DSP-2 Co-processor BIOS",
+            size: 8192,
+            required: false,
+            note: "Required for Dungeon Master"
+        },
+        {
+            name: "dsp3.rom",
+            description: "DSP-3 Co-processor BIOS",
+            size: 8192,
+            required: false,
+            note: "Required for SD Gundam GX"
+        },
+        {
+            name: "dsp4.rom",
+            description: "DSP-4 Co-processor BIOS",
+            size: 8192,
+            required: false,
+            note: "Required for Top Gear 3000"
+        },
+        {
+            name: "st010.rom",
+            description: "ST010 Co-processor BIOS",
+            size: 53248,
+            required: false,
+            note: "Required for F1 ROC II: Race of Champions"
+        },
+        {
+            name: "st011.rom",
+            description: "ST011 Co-processor BIOS",
+            size: 53248,
+            required: false,
+            note: "Required for Hayazashi Nidan Morita Shogi"
+        },
+        {
+            name: "st018.rom",
+            description: "ST018 Co-processor BIOS",
+            size: 163840,
+            required: false,
+            note: "Required for Hayazashi Nidan Morita Shogi 2"
+        },
+        {
+            name: "cx4.rom",
+            description: "CX4 Co-processor BIOS",
+            size: 3072,
+            required: false,
+            note: "Required for Mega Man X2, X3"
+        },
+        {
+            name: "sgb_boot.bin",
+            description: "Super Game Boy Boot ROM",
+            size: 256,
+            required: false,
+            note: "Required for Super Game Boy support"
+        },
+        {
+            name: "bs_x.bin",
+            description: "BS-X BIOS",
+            size: 1048576,
+            required: false,
+            note: "Required for Satellaview games"
+        }
+    ]
+},
+
+// OSD Actions
+actions: [
+    { id: "soft_reset", name: "Reset", description: "Reset the SNES", menu: "System" },
+    { id: "hard_reset", name: "Power Cycle", description: "Power cycle the SNES", menu: "System" },
+    { id: "save_state", name: "Save State", description: "Save current emulator state", menu: "State" },
+    { id: "load_state", name: "Load State", description: "Load previously saved state", menu: "State" }
+],
+
+// Configuration options
+config: {
+    default: 0,
+    options: [
+        // Video settings
+        {
+            name: "Region",
+            key: "REGION",
+            type: "enum",
+            values: [
+                { id: 0, name: "Auto" },
+                { id: 1, name: "NTSC" },
+                { id: 2, name: "PAL" }
+            ],
+            default: 0,
+            runtime: true,
+            menu: "Video"
+        },
+        {
+            name: "Hi-Res Mode",
+            key: "HIRES_MODE",
+            type: "enum",
+            values: [
+                { id: 0, name: "Scale to 512x448" },
+                { id: 1, name: "Native (256x224 / 512x448)" },
+                { id: 2, name: "Blend Hi-Res" }
+            ],
+            default: 0,
+            runtime: true,
+            menu: "Video"
+        },
+        {
+            name: "Aspect Ratio",
+            key: "ASPECT_RATIO",
+            type: "enum",
+            values: [
+                { id: 0, name: "Auto" },
+                { id: 1, name: "NTSC (8:7)" },
+                { id: 2, name: "PAL (11:8)" },
+                { id: 3, name: "Square Pixels" }
+            ],
+            default: 0,
+            runtime: true,
+            menu: "Video"
+        },
+        // Audio settings
+        {
+            name: "Interpolation",
+            key: "AUDIO_INTERPOLATION",
+            type: "enum",
+            values: [
+                { id: 0, name: "None" },
+                { id: 1, name: "Linear" },
+                { id: 2, name: "Gaussian (Accurate)" },
+                { id: 3, name: "Cubic" }
+            ],
+            default: 2,
+            runtime: true,
+            menu: "Audio"
+        }
+    ]
+}

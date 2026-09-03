@@ -1,0 +1,64 @@
+// Mesen2 Game Boy - Cycle-accurate Game Boy/Game Boy Color emulator core
+name: "Mesen2_GB",
+plugin: "mesen2_gb.so",
+
+metadata: {
+    shortname: "Mesen2",
+    fullname: "Nintendo Game Boy (Mesen2)",
+    manufacturer: "Nintendo",
+    year: "1989",
+    info: "Mesen2 is a highly accurate Game Boy and Game Boy Color emulator by Sour. It provides cycle-perfect emulation of the original DMG and CGB hardware.",
+    tags: ["Handheld", "Game Boy", "GBC", "Nintendo", "8-bit", "LR35902"],
+    icon: ""
+},
+
+extensions: ["gb", "gbc"],
+
+bios: {
+    directory: "gb",
+    files: [
+        {
+            name: "dmg_boot.bin",
+            description: "Game Boy Boot ROM",
+            size: 256,
+            sha256: "cf053eccb4ccafff9e67339d4e78e98dce7d1ed59be819d2a1ba2232c6fce1c7",
+            required: false,
+            note: "Optional - enables boot animation"
+        },
+        {
+            name: "cgb_boot.bin",
+            description: "Game Boy Color Boot ROM",
+            size: 2304,
+            sha256: "b4f2e416a35eef52cba161b159c7c8523a92594facb924b3ede0d722867c50c7",
+            required: false,
+            note: "Optional - enables GBC boot animation"
+        }
+    ]
+},
+
+actions: [
+    { id: "soft_reset", name: "Reset", description: "Reset the Game Boy", menu: "System" },
+    { id: "hard_reset", name: "Power Cycle", description: "Power cycle the Game Boy", menu: "System" },
+    { id: "save_state", name: "Save State", description: "Save current emulator state", menu: "State" },
+    { id: "load_state", name: "Load State", description: "Load previously saved state", menu: "State" }
+],
+
+config: {
+    default: 0,
+    options: [
+        {
+            name: "Game Boy Model",
+            key: "GB_MODEL",
+            type: "enum",
+            values: [
+                { id: 0, name: "Auto" },
+                { id: 1, name: "Game Boy (DMG)" },
+                { id: 2, name: "Game Boy Color (CGB)" },
+                { id: 3, name: "Super Game Boy" }
+            ],
+            default: 0,
+            runtime: false,
+            menu: "Hardware"
+        }
+    ]
+}
