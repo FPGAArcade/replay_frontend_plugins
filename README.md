@@ -38,6 +38,67 @@ somewhere else.
 The frontend scans that directory at start and watches it afterwards, so a rebuild plus a deploy is
 the whole loop.
 
+## Building the way a release is built
+
+```bash
+./build.sh stub --docker                    # x86_64, through the pinned toolchain image
+./build.sh stub --docker --target aarch64   # the device's architecture, cross-compiled
+```
+
+`--docker` re-enters `build.sh` inside the toolchain image that CI builds with, so the two are
+one script rather than two that drift. The image is Rocky 8: its glibc is 2.28, which is the
+oldest thing a published plugin has to run on, and linking against it makes every symbol
+reference in the result 2.28 or below by construction. `gcc-toolset-13` is the compiler on top
+of that old libc, and its libstdc++ is linked in statically, because the device's runtime is
+GCC 12's and could not satisfy a dynamic reference to it.
+
+arm64 is cross-compiled from inside that same x86_64 image, by clang, against a Rocky 8 arm64
+sysroot baked into it (`cmake/toolchain-aarch64.cmake`). The frontend's *device* sysroot is
+deliberately not used: it is Debian 12, and building against it would quietly raise the arm64
+floor to glibc 2.36 while every check here still passed.
+
+The container sees this repository at `/src` whoever builds it, which is what makes the result
+independent of where the checkout sits, so a contributor's artifact and a CI artifact are the
+same bytes. Container builds get their own build directory (`build/docker-release`) because a
+CMake cache remembers the absolute paths it was generated with.
+
+Bare-host is still the development path, and stays the default: it is faster, and a sideloaded
+plugin does not have to meet the floor.
+
+### The pin
+
+`docker/IMAGE` names the image by digest and is the only place it is named. `./build.sh
+--docker` reads it, CI reads it, and `scripts/check_image_pin.sh` fails if it is ever a tag -
+tags move, and a release built six months ago must still be rebuildable with the compiler it
+actually shipped with.
+
+Changing the toolchain is: edit `docker/Dockerfile.linux`, let the *Toolchain image* workflow
+publish it, and paste the digest it prints into `docker/IMAGE`. That one edit moves every
+consumer at once. It is a human step on purpose - a workflow that wrote the pin itself would
+let the compiler change without anyone reviewing it.
+
+Rocky 8's repositories roll forward under the pinned base image, so building the same
+Dockerfile twice months apart gives two different images. The Dockerfile is the recipe; the
+published digest is the reproducibility.
+
+### Auditing what came out
+
+```bash
+./scripts/check_abi_floor.sh build/docker-release/plugins/stub/stub.so
+```
+
+The build being green does not say a binary meets the floor, so this does, reading the ELF
+rather than the build that produced it: every versioned symbol need is `GLIBC_<= 2.28`, nothing
+but the C runtime and the loader is in `DT_NEEDED`, and the only thing exported is the plugin
+entry point. `readelf` reads any architecture, so the cross-built arm64 artifact is audited on
+the x86_64 machine that produced it. It is the counterpart to the SDK's `check_plugin.sh`,
+which audits the imports.
+
+The export check is not a formality. libstdc++'s headers put `namespace std` at default
+visibility, so a template member instantiated in a plugin is exported whatever
+`-fvisibility=hidden` says; two plugins doing that export the same symbol and the loader binds
+both to whichever it saw first. `cmake/plugin_exports.map` is what stops it.
+
 ## Working on the SDK at the same time
 
 ```bash
@@ -161,6 +222,10 @@ smoke/selftest.sh              # the smoke host: 18 cases
 scripts/upstream_selftest.sh   # prepare_upstream: 6 cases
 ```
 
+`scripts/check_abi_floor.sh` is a third check but not a suite: it audits a built artifact
+rather than testing this repository, and is described under *Building the way a release is
+built*.
+
 `smoke/selftest.sh` is described above. `scripts/upstream_selftest.sh` covers the half of
 `./build.sh` that every emulator plugin depends on and no plugin's own build exercises: that an
 uninitialised upstream is fetched, that its patch series is applied, that a second run refetches
@@ -172,6 +237,30 @@ nor a checked-out emulator.
 
 `cmake/ReplayPlugins.cmake` resolves the SDK, applies the repository-wide configuration, and
 includes the SDK's own `ReplaySDK.cmake`. A plugin's `CMakeLists.txt` needs nothing else.
+
+| File | What it is |
+|------|------------|
+| `ReplayPlugins.cmake` | the entry point above |
+| `ReplayRelease.cmake` | the release floor: hidden visibility, static libstdc++, reproducible paths |
+| `plugin_exports.map` | the version script that keeps a plugin's dynamic exports to its entry point |
+| `toolchain-aarch64.cmake` | the cross toolchain, usable only inside the image |
+| `Mesen2.cmake` | the shared build of the Mesen2 core the seven Mesen2 plugins link |
+
+## CI
+
+Two workflows. *CI* runs on every push and pull request: the repository's own test suites, then
+`plugins/stub` built through the pinned image for both targets and audited, then the same
+commit built a second time from a different path to check the artifacts still match byte for
+byte. Every build in it goes through `./build.sh --docker`, the same command a contributor
+runs.
+
+*Toolchain image* publishes `docker/Dockerfile.linux` to GHCR when `docker/` changes, and
+prints the digest to paste into `docker/IMAGE`. The package is public even though this
+repository is not, so an outside plugin author can pull the same digest CI uses.
+
+Only the stub is built. It exercises the whole path in under a minute; the emulator plugins are
+hundreds of megabytes of upstream each, and adding them is a question of what a runner's time
+is worth rather than of covering anything more.
 
 ## Upstream mirrors
 
