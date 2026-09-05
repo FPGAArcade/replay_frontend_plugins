@@ -1,0 +1,158 @@
+name: Re-sign channels
+
+# A channel expires whether or not anyone publishes to it: timestamp 90 days
+# after each signature, snapshot and targets a year. Monthly leaves two missed
+# runs of slack before the shortest of those lapses, and once it has lapsed this
+# job cannot recover the channel on its own, because `pull` refuses metadata
+# that no longer verifies.
+on:
+  schedule:
+    - cron: '23 4 1 * *'
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: Re-sign only this channel, for a drill
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+env:
+  CHANNEL_REPO: FPGAArcade/replay_frontend_plugins
+
+jobs:
+  # The channels are the committed anchors, so adding one is committing its
+  # root and nothing else.
+  discover:
+    runs-on: ubuntu-latest
+    outputs:
+      channels: ${{ steps.list.outputs.channels }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: list
+        run: |
+          set -euo pipefail
+          only="${{ inputs.channel }}"
+          if [ -n "$only" ]; then
+            if [ ! -f "channels/$only/root.json" ]; then
+              echo "::error::no trust anchor for channel '$only' in this repository"
+              exit 1
+            fi
+            channels=$(jq -cn --arg c "$only" '[$c]')
+          else
+            channels=$(find channels -mindepth 2 -maxdepth 2 -name root.json -printf '%h\n' \
+              | sed 's|^channels/||' | sort | jq -R . | jq -cs .)
+          fi
+          echo "channels=$channels" >> "$GITHUB_OUTPUT"
+          echo "re-signing: $channels"
+
+  resign:
+    needs: discover
+    if: needs.discover.outputs.channels != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        channel: ${{ fromJson(needs.discover.outputs.channels) }}
+    runs-on: ubuntu-latest
+    # Each channel's online keys and host credential live in their own
+    # environment. The root keys are not here and take no part in a re-sign.
+    environment: channel-signing-${{ matrix.channel }}
+    # Two signers racing — this job against itself, or against a publish — would
+    # both read the same versions and publish the same names with different
+    # bytes. The publish workflow shares this group.
+    concurrency:
+      group: sign-${{ matrix.channel }}
+      cancel-in-progress: false
+    env:
+      CHANNEL: ${{ matrix.channel }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/retrovert-publish
+
+      - name: Assemble a workspace holding only the online keys
+        env:
+          TARGETS_KEY: ${{ secrets.CHANNEL_TARGETS_KEY }}
+          SNAPSHOT_KEY: ${{ secrets.CHANNEL_SNAPSHOT_KEY }}
+          TIMESTAMP_KEY: ${{ secrets.CHANNEL_TIMESTAMP_KEY }}
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p workspace/keys/online workspace/repository/metadata
+
+          write_key() {
+            # An absent secret arrives as an empty variable rather than an
+            # error, and a one-byte PEM would otherwise get through the pull and
+            # only fail at the signing step — after a network round trip, with a
+            # parse error for a cause. Fail here instead, where the reason is
+            # legible.
+            if [ -z "$2" ]; then
+              echo "::error::the $1 key secret is empty or unset in this environment"
+              exit 1
+            fi
+            # Command substitution strips trailing newlines, so each PEM ends
+            # with exactly one however the secret was pasted in.
+            printf '%s\n' "$(printf '%s' "$2")" > "workspace/keys/online/$1.pem"
+          }
+          write_key targets   "$TARGETS_KEY"
+          write_key snapshot  "$SNAPSHOT_KEY"
+          write_key timestamp "$TIMESTAMP_KEY"
+
+          # The channel's trust anchor comes from this repository, reviewed and
+          # committed — never from the host being re-signed.
+          cp "channels/$CHANNEL/root.json" workspace/repository/metadata/root.json
+
+      - name: Take the chain the channel currently serves
+        run: |
+          set -euo pipefail
+          retrovert-publish pull workspace \
+            --repo "$CHANNEL_REPO" --channel "$CHANNEL"
+
+      - name: Re-sign it and publish the refreshed metadata
+        env:
+          GH_TOKEN: ${{ secrets.CHANNEL_TOKEN }}
+        run: |
+          # pipefail: the default shell is `bash -e`, so without it a failed
+          # re-sign would be masked by `tee` succeeding.
+          set -euo pipefail
+          retrovert-publish resign workspace \
+            --repo "$CHANNEL_REPO" --channel "$CHANNEL" | tee resign.out
+
+      # "The job ran" is not the thing worth knowing; "the metadata it left
+      # behind outlives the next few missed runs" is. Reading the expiries back
+      # out of the run turns a green tick into that claim.
+      - name: Check the expiries actually moved
+        run: |
+          set -euo pipefail
+          floor_days() {
+            case "$1" in
+              timestamp) echo 89 ;;
+              *)         echo 364 ;;
+            esac
+          }
+          seen=0
+          while read -r role _version _word expires; do
+            floor=$(floor_days "$role")
+            remaining=$(( ( $(date -u -d "$expires" +%s) - $(date -u +%s) ) / 86400 ))
+            echo "$role now expires in $remaining day(s)"
+            if [ "$remaining" -lt "$floor" ]; then
+              echo "::error::$role expires in $remaining days; the re-sign did not renew it"
+              exit 1
+            fi
+            seen=$((seen + 1))
+          done < <(grep -E '^(targets|snapshot|timestamp) +v[0-9]+ expires ' resign.out)
+          if [ "$seen" -ne 3 ]; then
+            echo "::error::expected three re-signed roles, read $seen"
+            exit 1
+          fi
+
+      - name: Read the channel back as a client does
+        run: |
+          set -euo pipefail
+          retrovert-publish verify \
+            "https://github.com/$CHANNEL_REPO/releases/download/$CHANNEL/channel-metadata/" \
+            "channels/$CHANNEL/root.json"
+
+      - name: Discard the keys
+        if: always()
+        run: rm -rf workspace/keys

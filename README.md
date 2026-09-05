@@ -130,6 +130,12 @@ scripts/upstream_selftest.sh   # prepare_upstream: 6 cases, offline, throwaway r
 
 Only the stub is built in CI.
 
+## Channels
+
+Plugin update channels are TUF repositories hosted on this repository's
+releases. Their trust anchors, signing workflows and bring-up steps are in
+[`channels/`](channels/README.md).
+
 ## Upstreams
 
 | Plugin | Upstream |

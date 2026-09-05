@@ -1,0 +1,5 @@
+# The retrovert-publish revision every channel workflow builds. A full commit
+# SHA, never a tag or branch; bumping it is the reviewed commit that says which
+# signer now holds the channel keys.
+REPO=https://github.com/RetrovertApp/retrovert-channels
+REV=9ce571b47aa67456a50b7b9b4a751ef422c7ab1c

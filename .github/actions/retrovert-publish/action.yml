@@ -1,0 +1,42 @@
+name: retrovert-publish
+description: Build the pinned retrovert-publish CLI and put it on PATH.
+
+runs:
+  using: composite
+  steps:
+    - name: Read the pin
+      shell: bash
+      run: |
+        set -euo pipefail
+        # shellcheck source=/dev/null
+        . "$GITHUB_WORKSPACE/channels/publish.pin"
+        # A branch or a short SHA would let the binary handed the channel's keys
+        # change without a commit here saying so.
+        if [[ ! "$REV" =~ ^[0-9a-f]{40}$ ]]; then
+          echo "::error::publish.pin REV must be a full 40-character commit SHA"
+          exit 1
+        fi
+        echo "PUBLISH_REPO=$REPO" >> "$GITHUB_ENV"
+        echo "PUBLISH_REV=$REV" >> "$GITHUB_ENV"
+
+    - uses: dtolnay/rust-toolchain@stable
+    - uses: Swatinem/rust-cache@v2
+      with:
+        key: retrovert-publish-${{ env.PUBLISH_REV }}
+
+    - name: Build the pinned signer
+      shell: bash
+      run: |
+        set -euo pipefail
+        # --locked so the dependency versions are the ones committed upstream
+        # alongside the revision being pinned, not whatever resolves today.
+        cargo install \
+          --git "$PUBLISH_REPO" --rev "$PUBLISH_REV" --locked \
+          --root "$RUNNER_TEMP/publish" \
+          retrovert-publish
+        echo "$RUNNER_TEMP/publish/bin" >> "$GITHUB_PATH"
+
+    - name: Report which signer this is
+      shell: bash
+      run: |
+        echo "signer: $($RUNNER_TEMP/publish/bin/retrovert-publish --version) at $PUBLISH_REV"

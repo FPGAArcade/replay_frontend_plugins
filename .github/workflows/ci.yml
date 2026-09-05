@@ -41,6 +41,44 @@ jobs:
       - name: prepare_upstream's own tests
         run: ./scripts/upstream_selftest.sh
 
+  anchors:
+    name: Channel anchors
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      # Every committed channel root must parse, carry the keys it names, and
+      # meet its own threshold, or nothing will ever bootstrap from it.
+      - name: Check every committed root
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          for root in channels/*/root.json; do
+            echo "::group::$root"
+            jq -e '.signed._type == "root"' "$root" > /dev/null \
+              || { echo "::error::$root is not root metadata"; exit 1; }
+            jq -e '[.signed.roles[].keyids[]] - (.signed.keys | keys) | length == 0' "$root" > /dev/null \
+              || { echo "::error::$root names a key id it does not carry"; exit 1; }
+            threshold=$(jq -r '.signed.roles.root.threshold' "$root")
+            signatures=$(jq -r '.signatures | length' "$root")
+            if [ "$signatures" -lt "$threshold" ]; then
+              echo "::error::$root carries $signatures signature(s) for a threshold of $threshold"
+              exit 1
+            fi
+            expires=$(jq -r '.signed.expires' "$root")
+            remaining=$(( ( $(date -u -d "$expires" +%s) - $(date -u +%s) ) / 86400 ))
+            echo "root: $threshold of $(jq -r '.signed.roles.root.keyids | length' "$root") key(s), $signatures signature(s), expires in $remaining day(s)"
+            if [ "$remaining" -lt 0 ]; then
+              echo "::error file=$root::root has expired; no client can bootstrap this channel"
+              exit 1
+            elif [ "$remaining" -lt 180 ]; then
+              echo "::warning file=$root::root expires in $remaining days; renew it"
+            fi
+            echo "::endgroup::"
+          done
+
+      - uses: ./.github/actions/retrovert-publish
+
   build:
     name: Build (${{ matrix.target }})
     runs-on: ubuntu-24.04
