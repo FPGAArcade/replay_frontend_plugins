@@ -58,6 +58,9 @@ jobs:
     # Each channel's online keys and host credential live in their own
     # environment. The root keys are not here and take no part in a re-sign.
     environment: channel-signing-${{ matrix.channel }}
+    # Writes this repository's own releases, so the built-in token suffices.
+    permissions:
+      contents: write
     # Two signers racing — this job against itself, or against a publish — would
     # both read the same versions and publish the same names with different
     # bytes. The publish workflow shares this group.
@@ -110,7 +113,7 @@ jobs:
 
       - name: Re-sign it and publish the refreshed metadata
         env:
-          GH_TOKEN: ${{ secrets.CHANNEL_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # pipefail: the default shell is `bash -e`, so without it a failed
           # re-sign would be masked by `tee` succeeding.

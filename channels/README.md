@@ -29,9 +29,9 @@ $ retrovert-publish check workspace
 ```
 
 1. Commit `workspace/repository/metadata/root.json` as `channels/<channel>/root.json`.
-2. Create the `channel-signing-<channel>` environment. Add the secrets below
-   from `workspace/keys/online/`, plus a `CHANNEL_TOKEN` with write access to
-   this repository's releases.
+2. Create the `channel-signing-<channel>` environment with deployment branches
+   restricted to `main` and no required reviewers. Add the three secrets below
+   from `workspace/keys/online/`.
 3. Upload every file in `workspace/repository/metadata/` as a flat asset of a
    release tagged `<channel>/channel-metadata`.
 4. Keep `workspace/keys/offline/root.pem` offline and safe. It never goes to
@@ -65,7 +65,9 @@ Per channel, in `channel-signing-<channel>`:
 | `CHANNEL_TARGETS_KEY` | `targets` private key, PKCS#8 PEM |
 | `CHANNEL_SNAPSHOT_KEY` | `snapshot` private key, PKCS#8 PEM |
 | `CHANNEL_TIMESTAMP_KEY` | `timestamp` private key, PKCS#8 PEM |
-| `CHANNEL_TOKEN` | write access to this repository's releases |
+
+Releases are written with the workflow's built-in token; no personal access
+token is needed.
 
 An unset secret arrives as an empty string; the assemble step fails on that
 before touching the channel.

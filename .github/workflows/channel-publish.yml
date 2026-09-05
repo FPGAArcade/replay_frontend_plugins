@@ -49,6 +49,9 @@ jobs:
     # Holds this channel's online keys and the credential that writes to its
     # host. The root keys are not here and take no part in a publish.
     environment: channel-signing-${{ inputs.channel }}
+    # Writes this repository's own releases, so the built-in token suffices.
+    permissions:
+      contents: write
     steps:
       - name: Check the request
         run: |
@@ -144,7 +147,7 @@ jobs:
 
       - name: Publish the metadata, timestamp last
         env:
-          GH_TOKEN: ${{ secrets.CHANNEL_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           stop_after_flag=""
