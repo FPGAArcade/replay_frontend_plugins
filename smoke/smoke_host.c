@@ -32,12 +32,13 @@
 #define SMOKE_EXIT_FAIL 1
 #define SMOKE_EXIT_USAGE 2
 
-// An optional export: a plugin that carries it must have been built against this ABI. Most do not,
-// and the entry point below is then the whole contract.
+// The two exports every emulator plugin carries. The frontend resolves the ABI version before it
+// reads the vtable and refuses a plugin that answers anything but its own, so this host does the
+// same: a plugin that passes here and is turned away there would be the worst kind of green.
 #define SMOKE_ABI_VERSION_SYMBOL "rp_emu_plugin_abi_version"
 #define SMOKE_ENTRY_POINT_SYMBOL "rp_emu_plugin_get"
 
-typedef u32 (*RpEmuPluginAbiVersionFunc)(void);
+typedef u64 (*RpEmuPluginAbiVersionFunc)(void);
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -184,13 +185,16 @@ static const RpEmuAPI* load_plugin(const char* path) {
     } symbol;
 
     symbol.object = dlsym(handle, SMOKE_ABI_VERSION_SYMBOL);
-    if (symbol.object) {
-        const u32 reported = symbol.abi_version();
-        if (reported != RP_EMU_API_VERSION) {
-            fprintf(stderr, "smoke: FAIL - %s reports ABI version %u; this host speaks %u\n", path, reported,
-                    (u32)RP_EMU_API_VERSION);
-            return nullptr;
-        }
+    if (!symbol.object) {
+        fprintf(stderr, "smoke: FAIL - %s exports no " SMOKE_ABI_VERSION_SYMBOL "\n", path);
+        return nullptr;
+    }
+
+    const u64 reported = symbol.abi_version();
+    if (reported != RP_PLUGIN_ABI_VERSION) {
+        fprintf(stderr, "smoke: FAIL - %s reports ABI version %llu; this host speaks %llu\n", path,
+                (unsigned long long)reported, (unsigned long long)RP_PLUGIN_ABI_VERSION);
+        return nullptr;
     }
 
     symbol.object = dlsym(handle, SMOKE_ENTRY_POINT_SYMBOL);

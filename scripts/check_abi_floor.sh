@@ -17,11 +17,16 @@
 #   2. DT_NEEDED. Only the C runtime and the loader; libstdc++.so.6 and libgcc_s.so.1 in
 #      particular must be absent, because the device's libstdc++ is GCC 12's and cannot
 #      satisfy a reference emitted by GCC 13.
-#   3. Dynamic exports. The plugin entry point, and at most the optional ABI-version symbol
-#      beside it. libstdc++'s headers put namespace std at default visibility, so a template
+#   3. Dynamic exports. The plugin entry point, and the ABI-version symbol beside it, and
+#      nothing else. libstdc++'s headers put namespace std at default visibility, so a template
 #      member instantiated in a plugin escapes -fvisibility=hidden and is exported unless the
 #      version script localises it; two plugins exporting the same std:: symbol get bound to
 #      whichever the loader saw first.
+#
+#      An emulator plugin must export rp_emu_plugin_abi_version: the host resolves it before it
+#      reads the vtable and refuses a plugin that answers anything but the version it was built
+#      for, so one built without it is rejected at load rather than run. Its absence is silent
+#      at build time, which is why it is checked here.
 #
 # readelf reads any architecture, so this audits the cross-built aarch64 artifact from the
 # x86_64 machine that produced it. That is the whole reason it is readelf and not nm/ldd.
@@ -89,10 +94,13 @@ for plugin in "$@"; do
         awk '$1 ~ /:$/ && $7 != "UND" && ($5 == "GLOBAL" || $5 == "WEAK") { sub(/@.*/, "", $8); print $8 }' |
         sort -u)
     entry_points=0
+    emu_entry=0
+    emu_abi_version=0
     for symbol in ${exports[@]+"${exports[@]}"}; do
         case "$symbol" in
-            rp_emu_plugin_get|rp_ui_plugin_get) ((++entry_points)) ;;
-            rp_emu_plugin_abi_version|rp_ui_plugin_abi_version) ;;
+            rp_emu_plugin_get) ((++entry_points)); emu_entry=1 ;;
+            rp_ui_plugin_get) ((++entry_points)) ;;
+            rp_emu_plugin_abi_version) emu_abi_version=1 ;;
             *)
                 echo "check_abi_floor: FAIL - ${name} exports ${symbol}, which is not part of the plugin ABI" >&2
                 failed=1
@@ -101,6 +109,11 @@ for plugin in "$@"; do
     done
     if ((entry_points != 1)); then
         echo "check_abi_floor: FAIL - ${name} exports ${entry_points} entry points; it must export exactly one" >&2
+        failed=1
+    fi
+    if ((emu_entry && !emu_abi_version)); then
+        echo "check_abi_floor: FAIL - ${name} exports no rp_emu_plugin_abi_version; the host resolves it before the vtable and would refuse this plugin at load" >&2
+        echo "    Place RP_EMU_PLUGIN_ABI_VERSION_EXPORT() at file scope in one of its translation units." >&2
         failed=1
     fi
 

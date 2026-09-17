@@ -12,9 +12,9 @@
 # host to bind at load, so localising everything here does not touch them.
 #
 # Two patterns, covering four names. rp_emu_plugin_get and rp_ui_plugin_get are the entry
-# points, and a plugin defines exactly one of them; rp_emu_plugin_abi_version is optional and a
-# plugin that carries it is asking to be version-checked, so localising it would turn a
-# rejection into a silent pass. Patterns rather than names because lld makes an unmatched name
+# points, and a plugin defines exactly one of them; rp_emu_plugin_abi_version is what the host
+# resolves before it reads the vtable, and localising it would turn every emulator plugin into
+# one the host refuses at load. Patterns rather than names because lld makes an unmatched name
 # in `global:` a link error, while an unmatched pattern is allowed.
 {
     global:

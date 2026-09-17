@@ -54,16 +54,23 @@ Audit a built artifact:
 ```
 
 Checks, from the ELF: every versioned symbol need is `GLIBC_<= 2.28`, `DT_NEEDED`
-holds only the C runtime and loader, and the only export is the plugin entry
-point. Works on the arm64 artifact from the x86_64 host. `cmake/plugin_exports.map`
-is what keeps libstdc++ template instantiations from leaking as exports.
+holds only the C runtime and loader, and the only exports are the plugin entry
+point and the ABI version beside it. Works on the arm64 artifact from the x86_64
+host. `cmake/plugin_exports.map` is what keeps libstdc++ template instantiations
+from leaking as exports.
+
+An emulator plugin exports two symbols, and `RP_EMU_PLUGIN_ABI_VERSION_EXPORT()`
+at file scope in one translation unit is the second. The frontend resolves it
+before it reads the vtable and refuses a plugin that answers anything but the
+version it was built for, so one built without it is turned away at load rather
+than run; the smoke host and the audit above both say so at build time instead.
 
 ## Plugin layout
 
 ```
 plugins/<name>/
     CMakeLists.txt      one add_replay_emu_plugin() call
-    <name>_core.c(pp)   the RpEmuAPI glue
+    <name>_core.c(pp)   the RpEmuAPI glue and the two exports
     <Name>.json5        config template, deployed beside the .so
     smoke.toml          boot smoke: fixture, frame count, audio assertion
     smoke/              fixtures, each with <fixture>.provenance.toml
@@ -107,7 +114,7 @@ smoke host lacks fails at load naming it; implement it in `smoke/host_symbols.c`
 ## Tests
 
 ```bash
-smoke/selftest.sh              # smoke host: 18 cases, including each failure mode's message
+smoke/selftest.sh              # smoke host: 19 cases, including each failure mode's message
 scripts/upstream_selftest.sh   # prepare_upstream: 6 cases, offline, throwaway repo under /tmp
 ```
 

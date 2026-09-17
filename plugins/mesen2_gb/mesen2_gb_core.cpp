@@ -182,3 +182,9 @@ static RpEmuAPI s_mesen2_gb_api = {
 extern "C" RP_EMU_EXPORT const RpEmuAPI* rp_emu_plugin_get(void) {
     return &s_mesen2_gb_api;
 }
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ABI version export. The host resolves this before it reads the vtable above and refuses the
+// plugin when the answer is not the version it was built for.
+
+RP_EMU_PLUGIN_ABI_VERSION_EXPORT()

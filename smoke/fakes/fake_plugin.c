@@ -8,6 +8,7 @@
 //   FAKE_HANG    run_frame never returns            -> the watchdog ends the run
 //   FAKE_BLANK   every pixel carries the same value -> the blank-framebuffer assertion
 //   FAKE_ABI     reports an ABI version that is not this one
+//   FAKE_NOABI   exports no ABI version at all
 //   FAKE_NOSLOT  leaves a required vtable slot empty
 //   FAKE_SILENT  runs correctly but emits no audio, so it passes a smoke that does not assert
 //                audio and fails one that does
@@ -18,9 +19,9 @@
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #include <replay/plugin.h>
 
-#if !defined(FAKE_HANG) && !defined(FAKE_BLANK) && !defined(FAKE_ABI) && !defined(FAKE_NOSLOT) && \
-    !defined(FAKE_SILENT) && !defined(FAKE_NOMEDIA) && !defined(FAKE_STRINGS)
-#error "define one of FAKE_HANG, FAKE_BLANK, FAKE_ABI, FAKE_NOSLOT, FAKE_SILENT, FAKE_NOMEDIA or FAKE_STRINGS"
+#if !defined(FAKE_HANG) && !defined(FAKE_BLANK) && !defined(FAKE_ABI) && !defined(FAKE_NOABI) && \
+    !defined(FAKE_NOSLOT) && !defined(FAKE_SILENT) && !defined(FAKE_NOMEDIA) && !defined(FAKE_STRINGS)
+#error "define one of FAKE_HANG, FAKE_BLANK, FAKE_ABI, FAKE_NOABI, FAKE_NOSLOT, FAKE_SILENT, FAKE_NOMEDIA or FAKE_STRINGS"
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -194,12 +195,19 @@ RP_EMU_EXPORT const RpEmuAPI* rp_emu_plugin_get(void) {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// FAKE_NOABI leaves the export out altogether and FAKE_ABI answers a version this host does not
+// speak; every other fake carries the honest one, which is what a real plugin's
+// RP_EMU_PLUGIN_ABI_VERSION_EXPORT() expands to.
+#if !defined(FAKE_NOABI)
+
+RP_EMU_EXPORT u64 rp_emu_plugin_abi_version(void);
+
+RP_EMU_EXPORT u64 rp_emu_plugin_abi_version(void) {
 #if defined(FAKE_ABI)
-
-RP_EMU_EXPORT u32 rp_emu_plugin_abi_version(void);
-
-RP_EMU_EXPORT u32 rp_emu_plugin_abi_version(void) {
-    return RP_EMU_API_VERSION + 1;
+    return RP_PLUGIN_ABI_VERSION + 1;
+#else
+    return RP_PLUGIN_ABI_VERSION;
+#endif
 }
 
 #endif

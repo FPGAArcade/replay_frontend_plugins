@@ -61,6 +61,7 @@ check "a blank framebuffer fails"            fail "is blank"      "$host" "$fake
 # The rest of the load-time and run-time contract.
 check "a working fake passes"                pass "PASS"          "$host" "$fakes/fake_silent.so" smoke/fakes/fake.toml
 check "a mismatched ABI version fails"       fail "ABI version"   "$host" "$fakes/fake_abi.so" smoke/fakes/fake.toml
+check "a missing ABI version fails"          fail "exports no rp_emu_plugin_abi_version" "$host" "$fakes/fake_noabi.so" smoke/fakes/fake.toml
 check "an empty required slot fails"         fail "required slot" "$host" "$fakes/fake_noslot.so" smoke/fakes/fake.toml
 check "asserted audio that never comes fails" fail "no audio"     "$host" "$fakes/fake_silent.so" smoke/fakes/audio.toml
 
