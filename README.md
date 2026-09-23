@@ -109,13 +109,33 @@ The host in `smoke/` links nothing from the frontend and implements the
 `fl_*`/`arena_*` symbols plugins bind to. A plugin calling a host symbol the
 smoke host lacks fails at load naming it; implement it in `smoke/host_symbols.c`.
 
-`--smoke` is informational. The publish gate lives in the release pipeline.
+`--smoke` is informational. The publish gate is what blocks a release.
+
+## Publish gate
+
+```bash
+./scripts/publish_gate.py check --build-dir build/docker-release --out index/ stub vamiga
+./scripts/publish_gate.py reproduce stub vamiga -- --docker --target aarch64
+```
+
+`check` fails a plugin that does not load on this machine's loader, reports another ABI
+version, exports anything but its two symbols, imports anything the host does not export, or
+has a template the index entry cannot be built from. It runs the smoke host with
+`--load-only`, `check_abi_floor.sh` and the SDK's `check_plugin.sh`, so it runs on the target
+it checks: the arm64 set on an arm64 machine. Each plugin that passes gets its plugin-index
+entry in `<out>/<id>.json`, and the id is the template's `name` lowercased, which must be the
+plugin's directory name. `platform`, `recommended` and `data_artifacts` are read from the
+template when it has them.
+
+`reproduce` builds a commit (`--ref`, default `HEAD`) twice, from clean clones at two paths,
+and fails unless the artifacts are byte-identical. Options after `--` go to `build.sh`.
 
 ## Tests
 
 ```bash
-smoke/selftest.sh              # smoke host: 19 cases, including each failure mode's message
+smoke/selftest.sh              # smoke host: 23 cases, including each failure mode's message
 scripts/upstream_selftest.sh   # prepare_upstream: 6 cases, offline, throwaway repo under /tmp
+scripts/publish_gate_selftest.sh  # publish gate: each failure named, the stub's entry, a reproducible rebuild
 ```
 
 ## cmake/
@@ -132,7 +152,7 @@ scripts/upstream_selftest.sh   # prepare_upstream: 6 cases, offline, throwaway r
 
 | Workflow | Trigger | Does |
 | --- | --- | --- |
-| *CI* | push, PR | image-pin check, both selftests, `stub` built through the image for both targets and audited, then rebuilt from another path and compared byte for byte |
+| *CI* | push, PR | image-pin check, the three selftests, `stub` built through the image for both targets and audited, then rebuilt from another path and compared byte for byte |
 | *Toolchain image* | changes under `docker/` | publishes `docker/Dockerfile.linux` to GHCR and prints the digest to pin |
 
 Only the stub is built in CI.

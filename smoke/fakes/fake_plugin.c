@@ -1,7 +1,8 @@
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// The negative half of the smoke host's own test: plugins built to fail, one way each.
+// The negative half of the smoke host's and the publish gate's own tests: plugins built to fail,
+// one way each.
 //
-// One source, three shared objects, chosen by the FAKE_* define its target sets. They exist so
+// One source, one shared object per case, chosen by the FAKE_* define its target sets. They exist so
 // that "the stub passes" is not the only thing the host is known to do -- a smoke host that never
 // fails anything proves nothing about the plugins it passes.
 //
@@ -16,12 +17,15 @@
 //                is asked to come up with nothing mounted
 //   FAKE_STRINGS round-trips a string through the host's string_copy/string_equals and refuses to
 //                mount unless it survives
+//   FAKE_EXPORT  exports a symbol that is not part of the plugin ABI
+//   FAKE_IMPORT  imports a symbol the host does not export
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #include <replay/plugin.h>
 
 #if !defined(FAKE_HANG) && !defined(FAKE_BLANK) && !defined(FAKE_ABI) && !defined(FAKE_NOABI) && \
-    !defined(FAKE_NOSLOT) && !defined(FAKE_SILENT) && !defined(FAKE_NOMEDIA) && !defined(FAKE_STRINGS)
-#error "define one of FAKE_HANG, FAKE_BLANK, FAKE_ABI, FAKE_NOABI, FAKE_NOSLOT, FAKE_SILENT, FAKE_NOMEDIA or FAKE_STRINGS"
+    !defined(FAKE_NOSLOT) && !defined(FAKE_SILENT) && !defined(FAKE_NOMEDIA) && !defined(FAKE_STRINGS) && \
+    !defined(FAKE_EXPORT) && !defined(FAKE_IMPORT)
+#error "define one of FAKE_HANG, FAKE_BLANK, FAKE_ABI, FAKE_NOABI, FAKE_NOSLOT, FAKE_SILENT, FAKE_NOMEDIA, FAKE_STRINGS, FAKE_EXPORT or FAKE_IMPORT"
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -66,8 +70,15 @@ static void* fake_create(FlArena* arena) {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#if defined(FAKE_IMPORT)
+void rp_fake_missing_host_function(void);
+#endif
+
 static void fake_destroy(void* instance) {
     (void)instance;
+#if defined(FAKE_IMPORT)
+    rp_fake_missing_host_function();
+#endif
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -208,6 +219,20 @@ RP_EMU_EXPORT u64 rp_emu_plugin_abi_version(void) {
 #else
     return RP_PLUGIN_ABI_VERSION;
 #endif
+}
+
+#endif
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// Named to match the version script's rp_*_plugin_get pattern, which is the only way a stray
+// symbol survives the release link.
+#if defined(FAKE_EXPORT)
+
+RP_EMU_EXPORT const RpEmuAPI* rp_stray_plugin_get(void);
+
+RP_EMU_EXPORT const RpEmuAPI* rp_stray_plugin_get(void) {
+    return &s_fake_api;
 }
 
 #endif

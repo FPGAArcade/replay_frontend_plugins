@@ -8,6 +8,9 @@
 // things a published plugin must do: still be running, and have produced a framebuffer that is not
 // blank. Audio is asserted only when the plugin opts in.
 //
+// --load-only stops after the load: the publish gate's dlopen and ABI check, which a plugin must
+// pass whether or not it has a smoke.toml.
+//
 // It links nothing but the plugin SDK's headers. The fl_*/arena_* symbols a plugin binds to come
 // from host_symbols.c in this executable, which is why adding a plugin's smoke is writing one
 // smoke.toml and no C at all.
@@ -167,10 +170,11 @@ static bool audio_has_signal(const RpEmuFrameContext* ctx, const RpAudioSpec* sp
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static const RpEmuAPI* load_plugin(const char* path) {
-    // RTLD_NOW, not lazy: a call this host does not implement then fails here, with the symbol
-    // named, instead of crashing in the middle of a frame.
-    void* handle = dlopen(path, RTLD_NOW | RTLD_LOCAL);
+// RTLD_NOW for a smoke: a call this host does not implement then fails here, with the symbol named,
+// instead of crashing in the middle of a frame. Lazy for --load-only, because this host implements
+// only what smoked plugins call; the gate checks imports against the real host's export list.
+static const RpEmuAPI* load_plugin(const char* path, int bind_mode) {
+    void* handle = dlopen(path, bind_mode | RTLD_LOCAL);
     if (!handle) {
         fprintf(stderr, "smoke: FAIL - cannot load %s: %s\n", path, dlerror());
         return nullptr;
@@ -317,11 +321,13 @@ static bool run_smoke(const RpEmuAPI* api, const SmokeConfig* config) {
 
 static void usage(void) {
     fprintf(stderr, "usage: replay_smoke <plugin.so> <smoke.toml> [--plugin-log]\n"
+                    "       replay_smoke <plugin.so> --load-only\n"
                     "\n"
                     "Loads a built emulator plugin, mounts the fixture smoke.toml names (or boots with\n"
                     "none when it names no fixture), runs its frames,\n"
                     "and fails unless the plugin is still running with a framebuffer that is not blank.\n"
-                    "  --plugin-log   also print what the plugin logs\n");
+                    "  --plugin-log   also print what the plugin logs\n"
+                    "  --load-only    load and check the plugin's ABI version and vtable, run nothing\n");
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -329,10 +335,13 @@ static void usage(void) {
 int main(int argc, char** argv) {
     const char* plugin_path = nullptr;
     const char* config_path = nullptr;
+    bool load_only = false;
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--plugin-log") == 0) {
             smoke_host_set_plugin_logging(true);
+        } else if (strcmp(argv[i], "--load-only") == 0) {
+            load_only = true;
         } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
             usage();
             return SMOKE_EXIT_PASS;
@@ -347,9 +356,17 @@ int main(int argc, char** argv) {
         }
     }
 
-    if (!plugin_path || !config_path) {
+    if (!plugin_path || load_only == (config_path != nullptr)) {
         usage();
         return SMOKE_EXIT_USAGE;
+    }
+
+    if (load_only) {
+        if (!load_plugin(plugin_path, RTLD_LAZY)) {
+            return SMOKE_EXIT_FAIL;
+        }
+        printf("smoke: LOADED - %s (ABI version %llu)\n", plugin_path, (unsigned long long)RP_PLUGIN_ABI_VERSION);
+        return SMOKE_EXIT_PASS;
     }
 
     SmokeConfig config = { 0 };
@@ -360,7 +377,7 @@ int main(int argc, char** argv) {
         return SMOKE_EXIT_FAIL;
     }
 
-    const RpEmuAPI* api = load_plugin(plugin_path);
+    const RpEmuAPI* api = load_plugin(plugin_path, RTLD_NOW);
     if (!api) {
         return SMOKE_EXIT_FAIL;
     }

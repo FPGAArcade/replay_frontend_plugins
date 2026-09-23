@@ -70,6 +70,13 @@ check "asserted audio that never comes fails" fail "no audio"     "$host" "$fake
 check "no fixture boots with none"           pass "PASS"          "$host" "$fakes/fake_nomedia.so" smoke/fakes/no_fixture.toml
 check "a fixture is passed as a path"        fail "refused"       "$host" "$fakes/fake_nomedia.so" smoke/fakes/fake.toml
 
+# --load-only: the gate's load. Lazy binding, so a host function the plugin never calls at load does
+# not fail it.
+check "--load-only loads and names the ABI"  pass "ABI version 1" "$host" "$stub" --load-only
+check "--load-only binds lazily"             pass "LOADED"        "$host" "$fakes/fake_import.so" --load-only
+check "--load-only still checks the ABI"     fail "ABI version"   "$host" "$fakes/fake_abi.so" --load-only
+check "--load-only takes no smoke.toml"      fail "usage"         "$host" "$stub" plugins/stub/smoke.toml --load-only
+
 # The host's own string functions, which it defines for the plugins it loads rather than links.
 check "the host's strings round-trip"        pass "PASS"          "$host" "$fakes/fake_strings.so" smoke/fakes/fake.toml
 
