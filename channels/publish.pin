@@ -2,4 +2,4 @@
 # SHA, never a tag or branch; bumping it is the reviewed commit that says which
 # signer now holds the channel keys.
 REPO=https://github.com/RetrovertApp/retrovert
-REV=7c60a52fcbcc88eaf311748d8fa131a19c21b5b0
+REV=e3435fbd36c3326d1aa34b914f7caff79fd4d649
