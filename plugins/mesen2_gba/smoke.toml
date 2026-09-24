@@ -1,0 +1,15 @@
+# The smoke run for this plugin: ./build.sh mesen2_gba --smoke.
+
+# A console draws nothing without a cartridge, so the smoke needs one. This one is a few dozen
+# bytes of our own that put a two-colour pattern on screen; scripts/make_smoke_roms.py writes it.
+fixture = "smoke/smoke.gba"
+
+# Five seconds of the machine's own time.
+frames = 300
+
+# The watchdog, not a budget: the run itself takes a couple of seconds.
+timeout_seconds = 60
+
+# Not asserted: Mesen2's audio never reaches the host through this wrapper, and
+# mesen2_nes/smoke.toml records why.
+audio = false
