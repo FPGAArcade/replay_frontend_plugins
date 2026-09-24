@@ -69,33 +69,8 @@
 #include "vicii_the64_vpl.h"
 #include "vicii_vice_vpl.h"
 
-#include "c64basic.h"
-#include "c64kernal.h"
-#include "c64kernalgs.h"
-#include "c64kernaled.h"
-#include "c64kernalsx.h"
-#include "c64kernaljp.h"
-#include "c64chargen.h"
-#include "c64chargenjp.h"
-#ifdef __XSCPU64__
-#include "scpu64mem.h"
-#include "scpu64kernal.h"
-#endif
-
+// Commodore's ROMs are not embedded: they ship as files in the plugin's data/ folder.
 static embedded_t c64files[] = {
-    { C64_BASIC_NAME, C64_BASIC_ROM_SIZE, C64_BASIC_ROM_SIZE, C64_BASIC_ROM_SIZE, basic64_rom },
-    { C64_KERNAL_REV3_NAME, C64_KERNAL_ROM_SIZE, C64_KERNAL_ROM_SIZE, C64_KERNAL_ROM_SIZE, kernal64_rom },
-    { C64_CHARGEN_NAME, C64_CHARGEN_ROM_SIZE, C64_CHARGEN_ROM_SIZE, C64_CHARGEN_ROM_SIZE, chargen_rom },
-    { C64_KERNAL_GS64_NAME, C64_KERNAL_ROM_SIZE, C64_KERNAL_ROM_SIZE, C64_KERNAL_ROM_SIZE, kernal64gs_rom },
-    { C64_KERNAL_4064_NAME, C64_KERNAL_ROM_SIZE, C64_KERNAL_ROM_SIZE, C64_KERNAL_ROM_SIZE, kernal64ed_rom },
-    { C64_KERNAL_SX64_NAME, C64_KERNAL_ROM_SIZE, C64_KERNAL_ROM_SIZE, C64_KERNAL_ROM_SIZE, kernal64sx_rom },
-    { C64_KERNAL_JAP_NAME, C64_KERNAL_ROM_SIZE, C64_KERNAL_ROM_SIZE, C64_KERNAL_ROM_SIZE, kernal64jp_rom },
-    { C64_CHARGEN_JAP_NAME, C64_CHARGEN_ROM_SIZE, C64_CHARGEN_ROM_SIZE, C64_CHARGEN_ROM_SIZE, chargenjp_rom },
-#ifdef __XSCPU64__
-    { "scpu64", SCPU64_SCPU64_ROM_MINSIZE, SCPU64_SCPU64_ROM_MAXSIZE, SCPU64_SCPU64_ROM_MAXSIZE, scpu64_rom },
-    { C64_CHARGEN_NAME, SCPU64_CHARGEN_ROM_SIZE, SCPU64_CHARGEN_ROM_SIZE, SCPU64_CHARGEN_ROM_SIZE, chargen_rom },
-    { C64_CHARGEN_JAP_NAME, SCPU64_CHARGEN_ROM_SIZE, SCPU64_CHARGEN_ROM_SIZE, SCPU64_CHARGEN_ROM_SIZE, chargenjp_rom },
-#endif
     EMBEDDED_LIST_END
 };
 

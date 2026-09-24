@@ -30,6 +30,9 @@ extern bool retro_disk_set_eject_state(bool ejected);
 extern dc_storage* dc;
 extern unsigned int vice_drive_halftrack[];
 
+#include <file/file_path.h>
+
+#include <dlfcn.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -389,7 +392,7 @@ static int16_t vice_input_state(unsigned port, unsigned device, unsigned index, 
 
 static size_t vice_audio_batch(const int16_t* data, size_t frames) {
     // Don't overflow the buffer
-    if (g_audio_frame_count + frames > AUDIO_BUFFER_MAX_FRAMES) {
+    if (frames > AUDIO_BUFFER_MAX_FRAMES - g_audio_frame_count) {
         frames = AUDIO_BUFFER_MAX_FRAMES - g_audio_frame_count;
     }
 
@@ -547,7 +550,30 @@ static void vice_c64_get_info(RpEmuInfo* info) {
     info->emu_version = "3.9";
     info->system_name = "Commodore 64";
     info->supported_extensions = "d64|d71|d80|d81|d82|g64|g41|x64|t64|tap|prg|p00|crt|bin|m3u|vsf|nib|nbz";
-    info->requires_bios = true;
+    info->requires_bios = false;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// VICE reads its ROMs from <system directory>/vice/, and they ship in data/ beside this plugin.
+// Not realpath: VICE stubs it out, and -Bsymbolic binds this call to the stub.
+static bool vice_find_system_directory(void) {
+    Dl_info info = { 0 };
+    const char* slash = nullptr;
+    if (dladdr((void*)&vice_find_system_directory, &info) && info.dli_fname) {
+        slash = strrchr(info.dli_fname, '/');
+    }
+    if (!slash) {
+        fl_log_error("VICE: cannot locate the plugin, so its data/ folder and the ROMs in it are not found");
+        return false;
+    }
+    snprintf(g_system_directory, sizeof(g_system_directory), "%.*s/data", (int)(slash - info.dli_fname),
+             info.dli_fname);
+    if (!path_is_directory(g_system_directory)) {
+        fl_log_error("VICE: no data folder at %s, so the ROMs are not found", g_system_directory);
+        return false;
+    }
+    return true;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -555,6 +581,12 @@ static void vice_c64_get_info(RpEmuInfo* info) {
 static void* vice_c64_create(FlArena* arena) {
 
     fl_log_info("Creating VICE C64 core");
+
+    // VICE reads the system directory in retro_set_environment, so it must be known first. Without
+    // its ROMs VICE fails to start and then double-frees on the way out, so refuse here instead.
+    if (!vice_find_system_directory()) {
+        return nullptr;
+    }
 
     ViceC64Core* core = arena_alloc_zero(arena, ViceC64Core);
     core->arena = arena;
@@ -570,7 +602,6 @@ static void* vice_c64_create(FlArena* arena) {
     retro_set_audio_sample_batch(vice_audio_batch);
     retro_set_audio_sample(vice_audio_sample);
 
-    // Initialize libretro core
     retro_init();
     core->initialized = true;
 

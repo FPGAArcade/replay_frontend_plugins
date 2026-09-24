@@ -45,6 +45,9 @@ jobs:
       - name: prepare_upstream's own tests
         run: ./scripts/upstream_selftest.sh
 
+      - name: fetch_verified's own tests
+        run: ./scripts/fetch_verified_selftest.sh
+
       - name: The publish gate's own tests
         run: ./scripts/publish_gate_selftest.sh
 

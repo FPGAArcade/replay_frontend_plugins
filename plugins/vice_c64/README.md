@@ -2,23 +2,28 @@
 
 The emulator is the libretro port of VICE, carried in-tree under `upstream/`.
 
-## The ROMs are deliberately absent
+## The ROMs
 
-`upstream/vice/data/` arrived from the frontend carrying 33 `.bin` files: Commodore's KERNAL,
-BASIC and CHARGEN images, plus the 1541 drive and printer ROMs. They were deleted before this
-plugin was first committed and must not come back.
+The plugin ships Commodore's C64 and drive ROMs, as VICE's own distribution does. They are
+Commodore's copyrighted code, not GPL (VICE's `README` says the same), and they are not kept in
+this repository: if the rights holder objects, removing them is a build change.
 
-They are Commodore's copyrighted code. This project has no right to redistribute them, and a
-published plugin that contained them would be distributing them to every user. Because git history
-is permanent, a single commit carrying them would be unfixable without rewriting a published
-repository, so the deletion has to happen before the copy lands rather than afterwards.
+The build fetches every `.bin` under `vice/data/C64/` and `vice/data/DRIVES/` from vice-libretro at
+the revision pinned in `CMakeLists.txt`, checks each against `roms.sha256`, and caches them in
+`build/downloads/`. They land in `data/vice/C64/` and `data/vice/DRIVES/` beside `vice_c64.so`,
+which is where the plugin points VICE's system directory.
 
-What remains in `data/` is VICE's own material -- palettes, keymaps, and its build files -- which
-is GPL like the rest of the emulator.
+To drop them: delete `roms.sha256` and the fetch block in `CMakeLists.txt`, and restore
+`requires_bios` in `get_info` and the `bios` block in `VICE_C64.json5`.
 
-The consequence is that the plugin cannot boot on its own. Its config template declares
-`requires_bios`, and the frontend supplies the ROMs the user has provided. A smoke for this plugin
-needs an open replacement set rather than a dump.
+## Re-syncing `upstream/`
 
-**If you re-sync `upstream/` from vice-libretro, delete `upstream/vice/data/**/*.bin` again as part
-of that sync**; upstream ships them and every update will bring them back.
+Upstream carries the ROMs twice, and both copies must go again on every sync:
+
+- delete `upstream/vice/data/**/*.bin`;
+- delete the ROM headers in `upstream/include/embedded/` (all but the `*_vpl.h` palettes), the
+  `retrodep/embedded/*embedded.c` files other than `c64embedded.c`, and the ROM entries in
+  `retrodep/embedded.c` and `retrodep/embedded/c64embedded.c`. VICE reads an embedded ROM before
+  any file, so a left-over one silently replaces the fetched set.
+
+`retrodep/ui.c` also loses its `vicerc-dump-*` write, which would land in the plugin's `data/`.

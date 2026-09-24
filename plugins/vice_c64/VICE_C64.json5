@@ -15,36 +15,6 @@ metadata: {
 
 extensions: ["d64", "d71", "d80", "d81", "d82", "g64", "g41", "x64", "t64", "tap", "prg", "p00", "crt", "bin", "m3u", "vsf", "nib", "nbz"],
 
-// The C64 ROMs are not shipped: they are Commodore's copyrighted code and this project has no
-// right to redistribute them. The user supplies them, and the sizes and hashes below are what a
-// correct set looks like. See README.md beside this file.
-bios: {
-    directory: "c64",
-    files: [
-        {
-            name: "kernal-901227-03.bin",
-            description: "C64 KERNAL ROM, revision 3",
-            size: 8192,
-            sha256: "83c60d47047d7beab8e5b7bf6f67f80daa088b7a6a27de0d7e016f6484042721",
-            required: true
-        },
-        {
-            name: "basic-901226-01.bin",
-            description: "C64 BASIC V2 ROM",
-            size: 8192,
-            sha256: "89878cea0a268734696de11c4bae593eaaa506465d2029d619c0e0cbccdfa62d",
-            required: true
-        },
-        {
-            name: "chargen-901225-01.bin",
-            description: "C64 character generator ROM",
-            size: 4096,
-            sha256: "fd0d53b8480e86163ac98998976c72cc58d5dd8eb824ed7b829774e74213b420",
-            required: true
-        }
-    ]
-},
-
 // Drive configuration
 drives: {
     floppy: [

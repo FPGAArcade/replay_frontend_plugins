@@ -231,12 +231,7 @@ extern int log_resources_set_string(const char *name, const char* value);
 
 int ui_init_finalize(void)
 {
-   /* Dump machine specific defaults for 'vicerc' usage, if not already dumped */
-   char resources_dump_path[RETRO_PATH_MAX] = {0};
-   snprintf(resources_dump_path, sizeof(resources_dump_path), "%s%s%s%s",
-         retro_system_data_directory, ARCHDEP_DIR_SEP_STR, "vicerc-dump-", machine_get_name());
-   if (!util_file_exists(resources_dump_path))
-      resources_dump(resources_dump_path);
+   /* No vicerc defaults dump: the system directory is the plugin's own data/ folder. */
 
    /* Model */
 #if defined(__XPET__)
