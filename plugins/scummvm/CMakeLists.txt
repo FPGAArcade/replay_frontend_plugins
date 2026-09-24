@@ -257,6 +257,49 @@ endforeach()
 file(GENERATE OUTPUT ${GENERATED_DIR}/engines/plugins_table.h CONTENT "${PLUGINS_TABLE}")
 file(GENERATE OUTPUT ${GENERATED_DIR}/engines/detection_table.h CONTENT "${DETECTION_TABLE}")
 
+# The engine-data files, picked from upstream's own install lists by the engines enabled above.
+# They ship in data/ beside scummvm.so, which is where addSysArchivesToSearchSet looks.
+set(ENABLED_SYMBOLS ${ENGINE_DEFINES} ${ENGINE_SUB_DEFINES})
+list(TRANSFORM ENABLED_SYMBOLS REPLACE "=1$" "")
+# fonts.dat is listed under USE_FREETYPE2, but the GUI needs it regardless.
+set(SCUMMVM_DATA_FILES
+    ${SCUMMVM_DIR}/dists/engine-data/fonts.dat
+    ${SCUMMVM_DIR}/gui/themes/translations.dat
+)
+foreach(MK engine_data_core engine_data engine_data_big)
+    set(MK_FILE ${SCUMMVM_DIR}/dists/engine-data/${MK}.mk)
+    file(STRINGS ${MK_FILE} MK_LINES)
+    set(CONDITION "")
+    foreach(LINE ${MK_LINES})
+        if(LINE MATCHES "^ifdef ([A-Z0-9_]+)$" AND NOT CONDITION)
+            set(CONDITION ${CMAKE_MATCH_1})
+        elseif(LINE STREQUAL "endif" AND CONDITION)
+            set(CONDITION "")
+        elseif(LINE MATCHES "^DIST_FILES_LIST \\+= ([^ ]+)$")
+            if(NOT CONDITION OR CONDITION IN_LIST ENABLED_SYMBOLS)
+                list(APPEND SCUMMVM_DATA_FILES ${SCUMMVM_DIR}/${CMAKE_MATCH_1})
+            endif()
+        elseif(NOT LINE MATCHES "^(#.*)?$")
+            message(FATAL_ERROR "${MK_FILE}: cannot read '${LINE}'")
+        endif()
+    endforeach()
+endforeach()
+list(REMOVE_DUPLICATES SCUMMVM_DATA_FILES)
+
+set(SCUMMVM_DATA_DIR ${CMAKE_CURRENT_BINARY_DIR}/data)
+set(SCUMMVM_DATA_STAMP ${CMAKE_CURRENT_BINARY_DIR}/data.stamp)
+# Recreated whole, so a dropped engine's file does not linger.
+add_custom_command(
+    OUTPUT ${SCUMMVM_DATA_STAMP}
+    COMMAND ${CMAKE_COMMAND} -E remove_directory ${SCUMMVM_DATA_DIR}
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${SCUMMVM_DATA_DIR}
+    COMMAND ${CMAKE_COMMAND} -E copy ${SCUMMVM_DATA_FILES} ${SCUMMVM_DATA_DIR}
+    COMMAND ${CMAKE_COMMAND} -E touch ${SCUMMVM_DATA_STAMP}
+    DEPENDS ${SCUMMVM_DATA_FILES} ${CMAKE_CURRENT_LIST_FILE}
+    VERBATIM
+)
+add_custom_target(scummvm_data DEPENDS ${SCUMMVM_DATA_STAMP})
+
 # Engine base sources (not in subdirectories)
 file(GLOB SCUMMVM_ENGINES_BASE ${SCUMMVM_DIR}/engines/*.cpp)
 
@@ -398,6 +441,8 @@ set_target_properties(scummvm_lib PROPERTIES
 #######################################################################
 
 add_replay_emu_plugin(NAME scummvm SOURCES scummvm_core.cpp)
+
+add_dependencies(scummvm scummvm_data)
 
 target_link_libraries(scummvm PRIVATE
     scummvm_lib

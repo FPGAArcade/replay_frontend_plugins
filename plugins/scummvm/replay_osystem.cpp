@@ -8,6 +8,7 @@
 #include "backends/saves/default/default-saves.h"
 #include "backends/timer/default/default-timer.h"
 #include "base/main.h"
+#include "common/fs.h"
 
 #include <ctime>
 #include <cstdio>
@@ -17,6 +18,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #else
+#include <dlfcn.h>
 #include <unistd.h>
 #include <time.h>
 #endif
@@ -321,10 +323,19 @@ void OSystem_Replay::logMessage(LogMessageType::Type type, const char *message) 
 // Add system archives to search set
 
 void OSystem_Replay::addSysArchivesToSearchSet(Common::SearchSet &s, int priority) {
-    // Add paths where ScummVM looks for data files
-    // These can be customized based on where the frontend stores game data
-    (void)s;
-    (void)priority;
+    // The engine-data files ship in data/ beside this plugin's shared object.
+    Dl_info info;
+    if (!dladdr((void *)&getTimeMillis, &info) || !info.dli_fname) {
+        logMessage(LogMessageType::kWarning, "ScummVM: cannot locate the plugin, so its data/ folder is not searched\n");
+        return;
+    }
+    Common::FSNode dataNode(Common::Path(info.dli_fname).getParent().appendComponent("data"));
+    if (!dataNode.isDirectory()) {
+        logMessage(LogMessageType::kWarning,
+                   Common::String::format("ScummVM: no data folder at %s\n", dataNode.getPath().toString().c_str()).c_str());
+        return;
+    }
+    s.add("REPLAY_DATA", new Common::FSDirectory(dataNode), priority);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

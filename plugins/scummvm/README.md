@@ -8,15 +8,16 @@ engines, not hardware, so no core will ever replace it.
 
 ## Unrostered
 
-ScummVM builds here but is not published: it stays out of every release plugin list and index until
-the critical below is fixed, and nothing else waits on it.
+ScummVM builds here but is not published: it stays out of every release plugin list and index. No
+critical holds it back any more; rostering means adding a `smoke.toml` and adding `scummvm` to the
+published set.
 
-- [#14](https://github.com/FPGAArcade/replay_frontend_plugins/issues/14): data files are never
-  installed. The engine-data files some engines need to start are not shipped, and
-  `addSysArchivesToSearchSet` searches nowhere. Fixing it means a `scummvm-data` companion artifact
-  and a search path pointing at it.
+## Engine data
 
-Rostering means closing it, adding a `smoke.toml`, and adding `scummvm` to the published set.
+Some engines, and the GUI, need support files from `upstream/dists/engine-data`. The build copies
+them into `data/` beside `scummvm.so`, and the plugin searches that folder at run time. The set is
+read from upstream's `engine_data*.mk` lists for the engines in `ENABLED_ENGINES`, plus `fonts.dat`
+and `translations.dat`, so enabling an engine brings its file with it.
 
 ## Engines
 

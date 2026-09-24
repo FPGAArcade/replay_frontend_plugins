@@ -37,7 +37,7 @@ usage() {
     echo "Configurations: debug (default), release, asan"
     echo "Options:"
     echo "  --sdk-dir DIR     build against a local SDK tree instead of the submodule in sdk/"
-    echo "  --deploy          copy the built plugin and its config template to the sideload directory"
+    echo "  --deploy          copy the built plugin, its config template and data/ to the sideload directory"
     echo "  --deploy-dir DIR  where --deploy copies to (default \$REPLAY_SIDELOAD_DIR, else $sideload_default)"
     echo "  --smoke           run the plugin's smoke.toml through the smoke host; informational only"
     echo "  --clean           remove the build directory first"
@@ -226,6 +226,11 @@ if ((deploy)); then
         # The template beside the shared object is what makes the directory a plugin the
         # frontend will pick up; without it the .so is just a file.
         cp plugins/"${plugin}"/*.json5 "$dest/"
+        # Support files the plugin reads at run time, replaced whole so none go stale.
+        rm -rf "$dest/data"
+        if [[ -d "${build_dir}/plugins/${plugin}/data" ]]; then
+            cp -r "${build_dir}/plugins/${plugin}/data" "$dest/"
+        fi
         say "Deployed ${plugin} to ${dest}"
     done
 fi
