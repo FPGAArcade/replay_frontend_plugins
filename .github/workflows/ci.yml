@@ -28,7 +28,11 @@ jobs:
     name: Repository checks
     runs-on: ubuntu-24.04
     steps:
+      # Full history: a clone of a shallow repository ignores --shared, and the publish gate's
+      # selftest reproduces a commit that no ref names.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       # A tag here would let CI and a contributor build with different compilers while both
       # looked correct, so it is refused before anything is built.
