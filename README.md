@@ -1,115 +1,37 @@
 # Replay emulator plugins
 
-Emulator plugins for the Replay frontend. Each is a shared object built against
-the plugin SDK, plus a config template the frontend reads. `sdk/` is a verbatim
-copy of [`replay_frontend_sdk`](https://github.com/FPGAArcade/replay_frontend_sdk)
-at the commit named in `sdk/UPSTREAM`; it is a copy rather than a submodule only
-because that repository is private and CI could not check it out.
+Emulator plugins for the Replay frontend. `sdk/` is a verbatim copy of
+[`replay_frontend_sdk`](https://github.com/FPGAArcade/replay_frontend_sdk) at the commit in
+`sdk/UPSTREAM`; never edit it locally.
 
 ## Build
 
 ```bash
-./build.sh --list                       # plugins in this repository
-./build.sh stub                         # debug, into build/debug/
-./build.sh stub release                 # release
-./build.sh stub asan                    # debug + AddressSanitizer
-./build.sh stub --deploy                # build, then copy to the frontend's sideload dir
-./build.sh stub --smoke                 # build, then run smoke.toml (informational)
-./build.sh stub --sdk-dir <frontend>/build/x64-debug/sdk   # against a local SDK
-./build.sh stub --docker                # x86_64 release, through the pinned toolchain image
-./build.sh stub --docker --target aarch64   # cross-compiled for the device
+./build.sh --list                           # plugins in this repository
+./build.sh stub [release|asan]              # into build/<config>/
+./build.sh stub --deploy                    # copy to ~/.replay2/system/emulators/<plugin>/
+./build.sh stub --smoke                     # run smoke.toml (informational)
+./build.sh stub --sdk-dir <frontend>/build/x64-debug/sdk
+./build.sh stub --docker [--target aarch64] # release through the pinned image, as CI does
 ```
 
-Only the named plugins are configured. `--deploy` copies to
-`~/.replay2/system/emulators/<plugin>/`, or `$REPLAY_SIDELOAD_DIR`, or
-`--deploy-dir`. The frontend scans that directory at start and watches it, so
-rebuild plus deploy is the whole loop.
+Release builds use the Rocky 8 image pinned by digest in `docker/IMAGE` (glibc floor 2.28).
+`scripts/check_abi_floor.sh <plugin.so>` audits an artifact.
 
-`--sdk-dir` prints a `[LOCAL SDK]` marker on every line. To take a published
-SDK change, replace `sdk/` wholesale with a fresh checkout, keep `sdk/UPSTREAM`,
-and record the new commit in it. Nothing in `sdk/` is edited locally.
-
-## Release builds
-
-`--docker` re-enters `build.sh` inside the image pinned by digest in
-`docker/IMAGE`. CI uses the same command. Output goes to
-`build/docker-release/`, and the repository is mounted at `/src` so artifacts
-are byte-identical regardless of checkout path.
-
-| | |
-| --- | --- |
-| Image | Rocky 8, `gcc-toolset-13`, libstdc++ linked statically |
-| glibc floor | 2.28 |
-| arm64 | clang cross-compile against a Rocky 8 arm64 sysroot in the image (`cmake/toolchain-aarch64.cmake`); the frontend's Debian 12 device sysroot is not used because it would raise the floor to 2.36 |
-| Pulling the image | needs `read:packages` until the GHCR package is public: `gh auth refresh -s read:packages && gh auth token \| docker login ghcr.io -u <you> --password-stdin` |
-
-Changing the toolchain: edit `docker/Dockerfile.linux`, let the *Toolchain
-image* workflow publish it, paste the printed digest into `docker/IMAGE`.
-`scripts/check_image_pin.sh` fails if the pin is a tag.
-
-Audit a built artifact:
-
-```bash
-./scripts/check_abi_floor.sh build/docker-release/plugins/stub/stub.so
-```
-
-Checks, from the ELF: every versioned symbol need is `GLIBC_<= 2.28`, `DT_NEEDED`
-holds only the C runtime and loader, and the only exports are the plugin entry
-point and the ABI version beside it. Works on the arm64 artifact from the x86_64
-host. `cmake/plugin_exports.map` is what keeps libstdc++ template instantiations
-from leaking as exports.
-
-An emulator plugin exports two symbols, and `RP_EMU_PLUGIN_ABI_VERSION_EXPORT()`
-at file scope in one translation unit is the second. The frontend resolves it
-before it reads the vtable and refuses a plugin that answers anything but the
-version it was built for, so one built without it is turned away at load rather
-than run; the smoke host and the audit above both say so at build time instead.
-
-## Plugin layout
+## Layout
 
 ```
 plugins/<name>/
     CMakeLists.txt      one add_replay_emu_plugin() call
-    <name>_core.c(pp)   the RpEmuAPI glue and the two exports
-    <Name>.json5        config template, deployed beside the .so
-    smoke.toml          boot smoke: fixture, frame count, audio assertion
-    smoke/              fixtures, each with <fixture>.provenance.toml
-    LICENSES/           every licence the built artifact ships under
-    upstream/           the emulator's source, committed in-tree
+    <name>_core.c(pp)   RpEmuAPI glue
+    <Name>.json5        config template
+    smoke.toml          boot smoke
+    LICENSES/           licences the artifact ships under
+    upstream/           emulator source, in-tree
 ```
 
-`plugins/stub` is the reference and has no `upstream/`. The seven `mesen2_*`
-plugins share `plugins/mesen2_shared` through `cmake/Mesen2.cmake`.
-
-Ported glue keeps upstream's spelling (`NULL`, `uint32_t`, `float`) and comments
-so a port can be diffed against its original. Only what the build here requires
-changes. Code written here, `plugins/stub` included, uses the project
-conventions.
-
-`scripts/upstream.sh` still supports a submodule-plus-patch-series layout
-(`upstream/` as a submodule, `patches/*.patch` applied in order). No plugin uses
-it; every upstream is committed in-tree.
-
-## Smoke
-
-`smoke.toml` is the whole of a plugin's smoke:
-
-```toml
-fixture = "smoke/fixture.stub"   # relative to this file; omit for a machine that boots to its own ROM
-frames = 10                      # must run past the whole boot, not just the first picture
-timeout_seconds = 10
-audio = true                     # optional: also assert audio was produced
-```
-
-Every fixture needs `<fixture>.provenance.toml` beside it, with `source` and
-`license` fields. Prefer open ROM replacements (EmuTOS, AROS, open C64 ROMs); a
-private CI ROM store is the recorded fallback.
-
-The host in `smoke/` links nothing from the frontend and implements the
-`fl_*`/`arena_*` symbols plugins bind to. A plugin calling a host symbol the
-smoke host lacks fails at load naming it; implement it in `smoke/host_symbols.c`.
-
-`--smoke` is informational. The publish gate is what blocks a release.
+`plugins/stub` is the reference. The `mesen2_*` plugins share `plugins/mesen2_shared`.
+Ported glue keeps upstream's style; new code follows the project conventions.
 
 ## Publish gate
 
@@ -118,63 +40,16 @@ smoke host lacks fails at load naming it; implement it in `smoke/host_symbols.c`
 ./scripts/publish_gate.py reproduce stub vamiga -- --docker --target aarch64
 ```
 
-`check` fails a plugin that does not load on this machine's loader, reports another ABI
-version, exports anything but its two symbols, imports anything the host does not export, or
-has a template the index entry cannot be built from. It runs the smoke host with
-`--load-only`, `check_abi_floor.sh` and the SDK's `check_plugin.sh`, so it runs on the target
-it checks: the arm64 set on an arm64 machine. Each plugin that passes gets its plugin-index
-entry in `<out>/<id>.json`, and the id is the template's `name` lowercased, which must be the
-plugin's directory name. `platform`, `recommended` and `data_artifacts` are read from the
-template when it has them.
-
-`reproduce` builds a commit (`--ref`, default `HEAD`) twice, from clean clones at two paths,
-and fails unless the artifacts are byte-identical. Options after `--` go to `build.sh`.
-
 ## Tests
 
 ```bash
-smoke/selftest.sh              # smoke host: 23 cases, including each failure mode's message
-scripts/upstream_selftest.sh   # prepare_upstream: 6 cases, offline, throwaway repo under /tmp
-scripts/publish_gate_selftest.sh  # publish gate: each failure named, the stub's entry, a reproducible rebuild
+smoke/selftest.sh
+scripts/upstream_selftest.sh
+scripts/publish_gate_selftest.sh
 ```
 
-## cmake/
-
-| File | Purpose |
-| --- | --- |
-| `ReplayPlugins.cmake` | entry point: resolves the SDK, applies repository-wide config, includes the SDK's `ReplaySDK.cmake` |
-| `ReplayRelease.cmake` | release floor: hidden visibility, static libstdc++, reproducible paths |
-| `plugin_exports.map` | version script limiting exports to the entry point |
-| `toolchain-aarch64.cmake` | cross toolchain, usable only inside the image |
-| `Mesen2.cmake` | shared Mesen2 core build |
-
-## CI
-
-| Workflow | Trigger | Does |
-| --- | --- | --- |
-| *CI* | push, PR | image-pin check, the three selftests, `stub` built through the image for both targets and audited, then rebuilt from another path and compared byte for byte |
-| *Toolchain image* | changes under `docker/` | publishes `docker/Dockerfile.linux` to GHCR and prints the digest to pin |
-
-Only the stub is built in CI.
-
-## Channels
-
-Plugin update channels are TUF repositories hosted on this repository's
-releases. Their trust anchors, signing workflows and bring-up steps are in
-[`channels/`](channels/README.md).
-
-## Upstreams
-
-| Plugin | Upstream |
-| --- | --- |
-| mesen2_* | https://github.com/SourMesen/Mesen2 |
-| scummvm | https://github.com/scummvm/scummvm |
-| vamiga | https://github.com/dirkwhoffmann/vAmiga |
-| vice_c64 | https://sourceforge.net/projects/vice-emu (git mirror: https://github.com/VICE-Team/svn-mirror) |
-
-FPGAArcade-owned mirrors are planned and not yet created.
+Update channels are described in [`channels/`](channels/README.md).
 
 ## Licensing
 
-Glue here is MIT (`LICENSE`). Each plugin's `LICENSES/` carries what its built
-artifact is distributed under, which for a real emulator is the upstream's.
+Glue is MIT (`LICENSE`). Each plugin's `LICENSES/` covers its built artifact.
