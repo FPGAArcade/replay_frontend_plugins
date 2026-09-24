@@ -247,6 +247,10 @@ static bool run_frames(const RpEmuAPI* api, void* instance, const SmokeConfig* c
         ctx.input = &input;
         ctx.delta_time = delta_time;
         api->run_frame(instance, &ctx);
+        if (api->get_state(instance) == RpEmuLifecycleState_Error) {
+            fprintf(stderr, "smoke: FAIL - the plugin is in its error state after frame %u\n", frame);
+            return false;
+        }
 
         const FrameGeometry geometry = frame_geometry(&ctx, &video);
         if (!frame_is_readable(&ctx, &video, &geometry, frame)) {
@@ -272,10 +276,6 @@ static bool run_frames(const RpEmuAPI* api, void* instance, const SmokeConfig* c
 
     printf("smoke: ran %u frames at %ux%u\n", config->frames, video.width, video.height);
 
-    if (api->get_state(instance) == RpEmuLifecycleState_Error) {
-        fprintf(stderr, "smoke: FAIL - the plugin is in its error state after %u frames\n", config->frames);
-        return false;
-    }
     if (blank_final_frame) {
         fprintf(stderr, "smoke: FAIL - frame %u is blank: every pixel carries the same value\n", config->frames - 1);
         return false;

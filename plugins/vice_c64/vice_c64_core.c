@@ -27,6 +27,7 @@
 extern void reload_restart(void);
 extern bool retro_disk_set_image_index(unsigned index);
 extern bool retro_disk_set_eject_state(bool ejected);
+extern int autostart_failed(void);
 extern dc_storage* dc;
 extern unsigned int vice_drive_halftrack[];
 
@@ -429,8 +430,8 @@ typedef struct ViceC64Core {
     RpAudioSpec audio_spec;
     FlString disk_path;
     bool initialized;
-    // Fast load: TDE disabled during initial load, enabled when warp turns off
-    bool tde_enabled;
+    // The autostart load ends when warp turns off.
+    bool load_finished;
     bool warp_was_on;
 
     // Multi-disk auto-swap state
@@ -510,8 +511,8 @@ static void vice_enter_fast_loading_mode(ViceC64Core* core, const char* reason) 
     (void)reason;
     vsync_set_warp_mode(1);
     core->warp_was_on = true;
-    core->tde_enabled = false;
-    fl_log_info("Warp mode enabled for fast loading (TDE disabled)");
+    core->load_finished = false;
+    fl_log_info("Warp mode enabled for loading");
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -751,16 +752,10 @@ static void vice_c64_unmount_media(void* core_instance) {
 
     fl_log_info("Unmounting media");
 
-    // Reset TDE to disabled for next load's fast loading phase
-    // This ensures the next game starts with TDE off for fast KERNAL load
-    // Only touch Drive8 - Drive9 should stay disabled to avoid breaking demos
-    log_resources_set_int("Drive8TrueEmulation", 0);
-    log_resources_set_int("VirtualDevice8", 1);
-
     retro_unload_game();
 
     // Reset our tracking state for next game
-    core->tde_enabled = false;
+    core->load_finished = false;
     core->warp_was_on = false;
     core->media_list = nullptr;
     core->media_count = 0;
@@ -791,14 +786,18 @@ static void vice_c64_run_frame(void* core_instance, RpEmuFrameContext* ctx) {
     // Run one frame
     retro_run();
 
+    // Without this a disk that never loads leaves BASIC's error on screen and looks like it ran.
+    if (autostart_failed()) {
+        fl_log_error("VICE: %S did not autostart", core->disk_path);
+        core->state = RpEmuLifecycleState_Error;
+        return;
+    }
+
     bool warp_is_on = vsync_get_warp_mode() != 0;
     ctx->skip_frame_pacing = warp_is_on;
-    if (core->warp_was_on && !warp_is_on && !core->tde_enabled) {
-        // Legacy behavior: when warp turns off, loading is considered complete.
-        log_resources_set_int("Drive8TrueEmulation", 1);
-        log_resources_set_int("VirtualDevice8", 0);
-        core->tde_enabled = true;
-        fl_log_info("Loading complete (warp transition) - TDE enabled for accurate emulation");
+    if (core->warp_was_on && !warp_is_on && !core->load_finished) {
+        core->load_finished = true;
+        fl_log_info("Loading complete (warp transition)");
     }
     core->warp_was_on = warp_is_on;
 
@@ -824,7 +823,7 @@ static void vice_c64_run_frame(void* core_instance, RpEmuFrameContext* ctx) {
                 }
             }
 
-            if (core->swap_arm_reached_far_track && core->tde_enabled && core->swap_cooldown_frames == 0) {
+            if (core->swap_arm_reached_far_track && core->load_finished && core->swap_cooldown_frames == 0) {
                 int delta = halftrack - core->swap_last_halftrack;
                 if (delta < 0) {
                     delta = -delta;
@@ -851,10 +850,10 @@ static void vice_c64_run_frame(void* core_instance, RpEmuFrameContext* ctx) {
                 if (trigger_track0 || trigger_stall) {
                     uint32_t next = core->current_disk_index + 1;
                     fl_log_info(
-                        "Auto-swap trigger: reason=%s streak0=%u stall=%u ht=%d max=%d next=%u/%u warp=%d tde=%d",
+                        "Auto-swap trigger: reason=%s streak0=%u stall=%u ht=%d max=%d next=%u/%u warp=%d loaded=%d",
                         trigger_track0 ? "track0" : "stall", core->track0_streak, core->hightrack_stall_streak,
                         halftrack, core->max_halftrack_seen, next + 1, core->media_count, warp_is_on ? 1 : 0,
-                        core->tde_enabled ? 1 : 0);
+                        core->load_finished ? 1 : 0);
                     vice_apply_disk_index(core, next);
                     fl_log_info("Auto-swap: switched to disk %u/%u", next + 1, core->media_count);
 
@@ -864,10 +863,10 @@ static void vice_c64_run_frame(void* core_instance, RpEmuFrameContext* ctx) {
             }
 
             if ((core->debug_frame_counter % 300) == 0) {
-                fl_log_debug("Auto-swap state: idx=%u/%u enabled=%d warp=%d tde=%d ht=%d max=%d arm=%d streak0=%u "
+                fl_log_debug("Auto-swap state: idx=%u/%u enabled=%d warp=%d loaded=%d ht=%d max=%d arm=%d streak0=%u "
                              "stall=%u cooldown=%u",
                              core->current_disk_index + 1, core->media_count, core->auto_swap_enabled ? 1 : 0,
-                             warp_is_on ? 1 : 0, core->tde_enabled ? 1 : 0, halftrack, core->max_halftrack_seen,
+                             warp_is_on ? 1 : 0, core->load_finished ? 1 : 0, halftrack, core->max_halftrack_seen,
                              core->swap_arm_reached_far_track ? 1 : 0, core->track0_streak,
                              core->hightrack_stall_streak, core->swap_cooldown_frames);
             }

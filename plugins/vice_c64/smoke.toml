@@ -1,0 +1,13 @@
+# The smoke run for this plugin: ./build.sh vice_c64 --smoke.
+
+# A disk of our own, written by scripts/make_smoke_roms.py. Its program loads a second file through
+# the emulated 1541 and only that file draws, so the frame stays blank unless both loads worked.
+fixture = "smoke/smoke.d64"
+
+frames = 600
+
+# The watchdog, not a budget.
+timeout_seconds = 60
+
+# Not asserted: the program draws, it does not play anything.
+audio = false

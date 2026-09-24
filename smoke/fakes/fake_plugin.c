@@ -8,6 +8,7 @@
 //
 //   FAKE_HANG    run_frame never returns            -> the watchdog ends the run
 //   FAKE_BLANK   every pixel carries the same value -> the blank-framebuffer assertion
+//   FAKE_ERROR   enters its error state after one frame and draws nothing more
 //   FAKE_ABI     reports an ABI version that is not this one
 //   FAKE_NOABI   exports no ABI version at all
 //   FAKE_NOSLOT  leaves a required vtable slot empty
@@ -28,10 +29,10 @@
 #include <replay/emu_plugin.h>
 #include <replay/plugin_info.h>
 
-#if !defined(FAKE_HANG) && !defined(FAKE_BLANK) && !defined(FAKE_ABI) && !defined(FAKE_NOABI) && \
-    !defined(FAKE_NOSLOT) && !defined(FAKE_SILENT) && !defined(FAKE_NOMEDIA) && !defined(FAKE_STRINGS) && \
-    !defined(FAKE_LOG) && !defined(FAKE_EXPORT) && !defined(FAKE_IMPORT)
-#error "define one of FAKE_HANG, FAKE_BLANK, FAKE_ABI, FAKE_NOABI, FAKE_NOSLOT, FAKE_SILENT, FAKE_NOMEDIA, FAKE_STRINGS, FAKE_LOG, FAKE_EXPORT or FAKE_IMPORT"
+#if !defined(FAKE_HANG) && !defined(FAKE_BLANK) && !defined(FAKE_ERROR) && !defined(FAKE_ABI) && \
+    !defined(FAKE_NOABI) && !defined(FAKE_NOSLOT) && !defined(FAKE_SILENT) && !defined(FAKE_NOMEDIA) && \
+    !defined(FAKE_STRINGS) && !defined(FAKE_LOG) && !defined(FAKE_EXPORT) && !defined(FAKE_IMPORT)
+#error "define one of FAKE_HANG, FAKE_BLANK, FAKE_ERROR, FAKE_ABI, FAKE_NOABI, FAKE_NOSLOT, FAKE_SILENT, FAKE_NOMEDIA, FAKE_STRINGS, FAKE_LOG, FAKE_EXPORT or FAKE_IMPORT"
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -131,6 +132,10 @@ static void fake_run_frame(void* instance, RpEmuFrameContext* ctx) {
 
 #if defined(FAKE_HANG)
     while (s_spin) {}
+#elif defined(FAKE_ERROR)
+    if (emu->frame_index > 0) {
+        return;
+    }
 #endif
 
     for (u32 i = 0; i < FAKE_WIDTH * FAKE_HEIGHT; i++) {
@@ -186,8 +191,12 @@ static void fake_get_audio_spec(void* instance, RpAudioSpec* spec) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 static RpEmuLifecycleState fake_get_state(void* instance) {
+#if defined(FAKE_ERROR)
+    return ((FakeEmu*)instance)->frame_index > 0 ? RpEmuLifecycleState_Error : RpEmuLifecycleState_Running;
+#else
     (void)instance;
     return RpEmuLifecycleState_Running;
+#endif
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

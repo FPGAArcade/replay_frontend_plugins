@@ -57,6 +57,7 @@ check() {
 check "the stub passes its smoke"            pass "PASS"          "$host" "$stub" plugins/stub/smoke.toml
 check "a plugin that hangs times out"        fail "timeout"       "$host" "$fakes/fake_hang.so" smoke/fakes/fake.toml
 check "a blank framebuffer fails"            fail "is blank"      "$host" "$fakes/fake_blank.so" smoke/fakes/fake.toml
+check "a plugin in its error state fails"    fail "error state"   "$host" "$fakes/fake_error.so" smoke/fakes/fake.toml
 
 # The rest of the load-time and run-time contract.
 check "a working fake passes"                pass "PASS"          "$host" "$fakes/fake_silent.so" smoke/fakes/fake.toml

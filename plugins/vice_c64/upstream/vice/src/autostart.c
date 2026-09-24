@@ -175,6 +175,16 @@ static int trigger_monitor = 0;
 
 int autostart_ignore_reset = 0; /* FIXME: only used by datasette.c, does it really have to be global? */
 
+#ifdef __LIBRETRO__
+/* Set when an autostart gives up, cleared when the next one starts. */
+static int autostart_failed_flag = 0;
+
+int autostart_failed(void)
+{
+    return autostart_failed_flag;
+}
+#endif
+
 static int autostart_disk_unit = DRIVE_UNIT_MIN; /* set by setup_for_disk */
 static int autostart_disk_drive = 0; /* set by setup_for_disk */
 
@@ -1523,6 +1533,8 @@ void autostart_advance(void)
         case AUTOSTART_ERROR:
 #ifndef __LIBRETRO__
             log_message(autostart_log, "Error");
+#else
+            autostart_failed_flag = 1;
 #endif
             restore_drive_emulation_state(autostart_disk_unit, autostart_disk_drive);
             autostartmode = AUTOSTART_DONE;
@@ -1572,6 +1584,9 @@ static void reboot_for_autostart(const char *program_name, unsigned int mode,
     autostartmode = mode;
     autostart_run_mode = runmode;
     autostart_wait_for_reset = 1;
+#ifdef __LIBRETRO__
+    autostart_failed_flag = 0;
+#endif
 
     autostart_initial_delay_cycles =
         (CLOCK)(((AutostartDelay == 0) ? AutostartDelayDefaultSeconds : AutostartDelay)

@@ -27,3 +27,5 @@ Upstream carries the ROMs twice, and both copies must go again on every sync:
   any file, so a left-over one silently replaces the fetched set.
 
 `retrodep/ui.c` also loses its `vicerc-dump-*` write, which would land in the plugin's `data/`.
+`vice/src/autostart.c` gains `autostart_failed()`, which the wrapper reads to report a disk that
+did not autostart.

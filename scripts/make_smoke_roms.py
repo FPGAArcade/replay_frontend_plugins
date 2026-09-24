@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Writes the smoke fixtures for the Mesen2 systems that have no redistributable homebrew.
+"""Writes the smoke fixtures for the systems that have no redistributable homebrew.
 
   make_smoke_roms.py
 
-Each ROM is hand-assembled here: it turns the display on and fills the screen with one tile whose
-left half is colour 0 and right half colour 1, then spins. That is all a smoke needs, since the
+Each console ROM is hand-assembled here: it turns the display on and fills the screen with one tile
+whose left half is colour 0 and right half colour 1, then spins. That is all a smoke needs, since the
 host fails a frame whose pixels all carry the same value. Encodings are in the comments.
 """
 
@@ -220,12 +220,95 @@ def ws():
     return bytes(rom)
 
 
+BASIC_TOKENS = {"IF": 0x8B, "THEN": 0xA7, "SYS": 0x9E, "POKE": 0x97, "PRINT": 0x99, "CHR$": 0xC7,
+                "FOR": 0x81, "TO": 0xA4, "NEXT": 0x82, "LOAD": 0x93, "=": 0xB2}
+
+
+def basic(lines):
+    # Tokenised C64 BASIC at 0x0801. Keywords are tokens everywhere but inside quotes.
+    prg = bytearray()
+    address = 0x0801
+    for number, text in lines.items():
+        body = bytearray(number.to_bytes(2, "little"))
+        quoted = False
+        i = 0
+        while i < len(text):
+            keyword = None if quoted else next((k for k in BASIC_TOKENS if text.startswith(k, i)), None)
+            if keyword:
+                body.append(BASIC_TOKENS[keyword])
+                i += len(keyword)
+            else:
+                quoted ^= text[i] == '"'
+                body += text[i].encode()
+                i += 1
+        body.append(0)
+        address += 2 + len(body)
+        prg += address.to_bytes(2, "little") + body
+    return bytes(prg + b"\0\0")
+
+
+def c64():
+    # A 1541 disk. SMOKE blacks out the screen, waits a second, by which time the plugin has turned
+    # true drive emulation back on, and loads PATTERN through the emulated drive. LOAD in a program
+    # reruns it from the top, where A is now set, so it calls PATTERN, which fills the screen with
+    # colour stripes. Everything else, an error message included, is black on black.
+    smoke = basic({
+        10: "IF A THEN SYS 49152",
+        20: "A=1:POKE 53280,0:POKE 53281,0:POKE 646,0:PRINT CHR$(147):FOR I=1 TO 1000:NEXT",
+        30: 'LOAD "PATTERN",8,1',
+    })
+    a = Asm(0xC000)
+    a(0xA2, 0x00)  # ldx #0
+    loop = a.here()
+    a(0xA9, 0xA0)  # lda #$A0                           a solid block
+    for page in range(0x04, 0x08):
+        a(0x9D, 0x00, page)  # sta $0400,x ... $0700,x   screen
+    a(0x8A)  # txa                                       colour x & 15
+    for page in range(0xD8, 0xDC):
+        a(0x9D, 0x00, page)  # sta $D800,x ... $DB00,x   colour RAM
+    a(0xE8)  # inx
+    a.rel8(0xD0, loop)  # bne
+    a(0x4C, *a.here().to_bytes(2, "little"))  # jmp .
+
+    sectors = [21] * 17 + [19] * 7 + [18] * 6 + [17] * 5
+    disk = bytearray(sum(sectors) * 256)
+
+    def sector(track, index):
+        offset = (sum(sectors[: track - 1]) + index) * 256
+        return memoryview(disk)[offset : offset + 256]
+
+    files = [("SMOKE", 0x0801, smoke, (17, 0)), ("PATTERN", 0xC000, bytes(a.code), (17, 1))]
+    directory = sector(18, 1)
+    directory[0:2] = bytes((0, 0xFF))  # the only directory sector
+    for i, (name, load, data, (track, index)) in enumerate(files):
+        payload = load.to_bytes(2, "little") + data
+        assert len(payload) <= 254, name
+        block = sector(track, index)
+        block[0:2] = bytes((0, len(payload) + 1))  # last block: offset of its last byte
+        block[2 : 2 + len(payload)] = payload
+        entry = directory[32 * i : 32 * i + 32]
+        entry[2:5] = bytes((0x82, track, index))  # closed PRG
+        entry[5:21] = name.encode().ljust(16, b"\xa0")
+        entry[30:32] = (1).to_bytes(2, "little")  # one block
+
+    bam = sector(18, 0)
+    bam[0:4] = bytes((18, 1, 0x41, 0))  # directory at 18/1, DOS format 'A'
+    used = {(18, 0), (18, 1)} | {ts for *_, ts in files}
+    for track in range(1, 36):
+        free = [s for s in range(sectors[track - 1]) if (track, s) not in used]
+        bits = sum(1 << s for s in free)
+        bam[4 * track : 4 * track + 4] = bytes((len(free),)) + bits.to_bytes(3, "little")
+    bam[0x90:0xAB] = b"REPLAY SMOKE".ljust(16, b"\xa0") + b"\xa0\xa0RS\xa02A" + b"\xa0" * 4
+    return bytes(disk)
+
+
 ROMS = {
     "mesen2_gba/smoke/smoke.gba": gba,
     "mesen2_pce/smoke/smoke.pce": pce,
     "mesen2_sms/smoke/smoke.sms": sms,
     "mesen2_snes/smoke/smoke.sfc": snes,
     "mesen2_ws/smoke/smoke.ws": ws,
+    "vice_c64/smoke/smoke.d64": c64,
 }
 
 if __name__ == "__main__":

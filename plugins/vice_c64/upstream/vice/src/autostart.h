@@ -77,6 +77,9 @@ extern int autostart_ignore_reset;
 extern int autostart_tape_basic_load;
 
 int autostart_in_progress(void);
+#ifdef __LIBRETRO__
+int autostart_failed(void);
+#endif
 
 void autostart_trigger_monitor(int enable);
 
