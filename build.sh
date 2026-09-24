@@ -5,7 +5,7 @@
 #   ./build.sh stub release          release build
 #   ./build.sh stub --deploy         build, then drop it where the frontend will find it
 #   ./build.sh stub --smoke          build, then run the plugin's smoke (informational)
-#   ./build.sh stub --sdk-dir ~/replay_frontend/build/x64-debug/sdk
+#   ./build.sh stub --sdk-dir ~/replay_frontend/build/x64-debug/emu-sdk
 #   ./build.sh stub --docker         build through the pinned toolchain image, as CI does
 #   ./build.sh stub --docker --target aarch64
 #   ./build.sh --list                what is in plugins/
@@ -36,7 +36,7 @@ usage() {
     echo
     echo "Configurations: debug (default), release, asan"
     echo "Options:"
-    echo "  --sdk-dir DIR     build against a local SDK tree instead of the copy in sdk/"
+    echo "  --sdk-dir DIR     build against a local SDK tree instead of the submodule in sdk/"
     echo "  --deploy          copy the built plugin and its config template to the sideload directory"
     echo "  --deploy-dir DIR  where --deploy copies to (default \$REPLAY_SIDELOAD_DIR, else $sideload_default)"
     echo "  --smoke           run the plugin's smoke.toml through the smoke host; informational only"
@@ -82,8 +82,8 @@ for plugin in "${plugins[@]}"; do
     fi
 done
 
-# The SDK: the copy in sdk/, or whatever tree --sdk-dir names. Every line this script and the
-# build print carries the [LOCAL SDK] marker while the override is in effect.
+# The SDK: the pinned submodule in sdk/, or whatever tree --sdk-dir names. Every line this script
+# and the build print carries the [LOCAL SDK] marker while the override is in effect.
 marker=""
 if [[ -n "$sdk_dir" ]]; then
     sdk_dir="$(cd "$sdk_dir" 2>/dev/null && pwd)" || { echo "build.sh: no such --sdk-dir: $sdk_dir" >&2; exit 2; }
@@ -94,9 +94,9 @@ if [[ -n "$sdk_dir" ]]; then
     marker="[LOCAL SDK] "
 else
     sdk_dir="$repo_dir/sdk"
-    if [[ ! -f "$sdk_dir/cmake/ReplaySDK.cmake" ]]; then
-        echo "build.sh: no SDK in ${sdk_dir}. It is carried in this repository, so a checkout" >&2
-        echo "  should have it; see sdk/UPSTREAM. Or pass --sdk-dir <a staged SDK>." >&2
+    if [[ ! -f "$sdk_dir/cmake/ReplaySDK.cmake" ]] && ! git submodule update --init sdk; then
+        echo "build.sh: could not fetch the SDK submodule into ${sdk_dir}." >&2
+        echo "  Or pass --sdk-dir <a staged SDK>." >&2
         exit 1
     fi
 fi

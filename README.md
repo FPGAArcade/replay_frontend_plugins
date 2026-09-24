@@ -1,8 +1,8 @@
 # Replay emulator plugins
 
-Emulator plugins for the Replay frontend. `sdk/` is a verbatim copy of
-[`replay_frontend_sdk`](https://github.com/FPGAArcade/replay_frontend_sdk) at the commit in
-`sdk/UPSTREAM`; never edit it locally.
+Emulator plugins for the Replay frontend. `sdk/` is a submodule of the public
+[`replay_emulator_sdk`](https://github.com/FPGAArcade/replay_emulator_sdk); `./build.sh`
+fetches it.
 
 ## Build
 
@@ -11,7 +11,7 @@ Emulator plugins for the Replay frontend. `sdk/` is a verbatim copy of
 ./build.sh stub [release|asan]              # into build/<config>/
 ./build.sh stub --deploy                    # copy to ~/.replay2/system/emulators/<plugin>/
 ./build.sh stub --smoke                     # run smoke.toml (informational)
-./build.sh stub --sdk-dir <frontend>/build/x64-debug/sdk
+./build.sh stub --sdk-dir <frontend>/build/x64-debug/emu-sdk
 ./build.sh stub --docker [--target aarch64] # release through the pinned image, as CI does
 ```
 

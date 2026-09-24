@@ -4,7 +4,7 @@
 # ReplaySDK.cmake, which is where add_replay_emu_plugin comes from. A plugin's CMakeLists needs
 # nothing beyond that one call.
 
-# The SDK is a submodule pinned at a commit of FPGAArcade/replay_frontend_sdk. REPLAY_SDK_DIR names
+# The SDK is a submodule pinned at a commit of FPGAArcade/replay_emulator_sdk. REPLAY_SDK_DIR names
 # a different tree when ./build.sh --sdk-dir is used, and REPLAY_LOCAL_SDK says that it did.
 if(NOT REPLAY_SDK_DIR)
     set(REPLAY_SDK_DIR "${CMAKE_SOURCE_DIR}/sdk")

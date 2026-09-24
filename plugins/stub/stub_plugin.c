@@ -1,5 +1,5 @@
 // The smallest Replay emulator plugin in C, and the reference every plugin in this repository
-// follows: one include, one instance struct, one RpEmuAPI, one exported entry point.
+// follows: one instance struct, one RpEmuAPI, one exported entry point.
 //
 // There is no emulator behind it. It synthesizes a framebuffer and an audio ramp from a frame
 // counter, so a given frame index always produces the same bytes -- enough to prove the whole
@@ -7,7 +7,11 @@
 //
 // Every fl_*/arena_* call binds to the flowi shared library; every rp_* call binds to the host
 // process when the plugin is loaded. The plugin links neither.
-#include <replay/plugin.h>
+#include <flowi/arena/arena_macros.h>
+#include <flowi/core/log_macros.h>
+#include <flowi/core/types.h>
+#include <replay/emu_plugin.h>
+#include <replay/plugin_info.h>
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

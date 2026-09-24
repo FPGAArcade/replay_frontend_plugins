@@ -20,7 +20,11 @@
 //   FAKE_EXPORT  exports a symbol that is not part of the plugin ABI
 //   FAKE_IMPORT  imports a symbol the host does not export
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#include <replay/plugin.h>
+#include <flowi/arena/arena_macros.h>
+#include <flowi/core/types.h>
+#include <flowi/string/string.h>
+#include <replay/emu_plugin.h>
+#include <replay/plugin_info.h>
 
 #if !defined(FAKE_HANG) && !defined(FAKE_BLANK) && !defined(FAKE_ABI) && !defined(FAKE_NOABI) && \
     !defined(FAKE_NOSLOT) && !defined(FAKE_SILENT) && !defined(FAKE_NOMEDIA) && !defined(FAKE_STRINGS) && \
