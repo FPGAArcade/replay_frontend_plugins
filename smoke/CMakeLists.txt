@@ -16,7 +16,7 @@ target_include_directories(replay_smoke PRIVATE "${REPLAY_SDK_DIR}/include")
 target_link_libraries(replay_smoke PRIVATE ${CMAKE_DL_LIBS})
 target_compile_options(replay_smoke PRIVATE -Wall -Wextra)
 
-foreach(fake hang blank abi noabi noslot silent nomedia strings export)
+foreach(fake hang blank abi noabi noslot silent nomedia strings log export)
     string(TOUPPER "${fake}" fake_upper)
     add_replay_emu_plugin(NAME fake_${fake} SOURCES fakes/fake_plugin.c)
     target_compile_definitions(fake_${fake} PRIVATE FAKE_${fake_upper})

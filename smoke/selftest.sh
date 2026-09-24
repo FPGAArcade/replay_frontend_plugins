@@ -80,6 +80,11 @@ check "--load-only takes no smoke.toml"      fail "usage"         "$host" "$stub
 # The host's own string functions, which it defines for the plugins it loads rather than links.
 check "the host's strings round-trip"        pass "PASS"          "$host" "$fakes/fake_strings.so" smoke/fakes/fake.toml
 
+# The host's log formatter: %S is an FlString, as in flowi, not glibc's wide string.
+check "%S prints an FlString's bytes"        pass "[floppy_a.st] [null]" "$host" "$fakes/fake_log.so" smoke/fakes/fake.toml --plugin-log
+check "the other directives still format"    pass "[-42 ok  1.50 abc 7 %]" "$host" "$fakes/fake_log.so" smoke/fakes/fake.toml --plugin-log
+check "an unknown specifier is shown"        pass "1 then <unsupported %y> then %d" "$host" "$fakes/fake_log.so" smoke/fakes/fake.toml --plugin-log
+
 # Fixture provenance, and the configuration itself.
 check "a fixture without provenance fails"   fail "provenance"    "$host" "$stub" smoke/fakes/unprovenanced.toml
 check "a smoke.toml that is not there fails" fail "cannot read"   "$host" "$stub" smoke/fakes/no-such.toml

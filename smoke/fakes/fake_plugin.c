@@ -17,10 +17,12 @@
 //                is asked to come up with nothing mounted
 //   FAKE_STRINGS round-trips a string through the host's string_copy/string_equals and refuses to
 //                mount unless it survives
+//   FAKE_LOG     logs through the host's formatter, %S included, so its output can be checked
 //   FAKE_EXPORT  exports a symbol that is not part of the plugin ABI
 //   FAKE_IMPORT  imports a symbol the host does not export
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #include <flowi/arena/arena_macros.h>
+#include <flowi/core/log_macros.h>
 #include <flowi/core/types.h>
 #include <flowi/string/string.h>
 #include <replay/emu_plugin.h>
@@ -28,8 +30,8 @@
 
 #if !defined(FAKE_HANG) && !defined(FAKE_BLANK) && !defined(FAKE_ABI) && !defined(FAKE_NOABI) && \
     !defined(FAKE_NOSLOT) && !defined(FAKE_SILENT) && !defined(FAKE_NOMEDIA) && !defined(FAKE_STRINGS) && \
-    !defined(FAKE_EXPORT) && !defined(FAKE_IMPORT)
-#error "define one of FAKE_HANG, FAKE_BLANK, FAKE_ABI, FAKE_NOABI, FAKE_NOSLOT, FAKE_SILENT, FAKE_NOMEDIA, FAKE_STRINGS, FAKE_EXPORT or FAKE_IMPORT"
+    !defined(FAKE_LOG) && !defined(FAKE_EXPORT) && !defined(FAKE_IMPORT)
+#error "define one of FAKE_HANG, FAKE_BLANK, FAKE_ABI, FAKE_NOABI, FAKE_NOSLOT, FAKE_SILENT, FAKE_NOMEDIA, FAKE_STRINGS, FAKE_LOG, FAKE_EXPORT or FAKE_IMPORT"
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -99,6 +101,12 @@ static bool fake_mount_media(void* instance, const char* path) {
 #else
     (void)instance;
     (void)path;
+#if defined(FAKE_LOG)
+    const FlString none = { 0 };
+    fl_log_info("fake log: [%S] [%S]", string_from_cstr("floppy_a.st"), none);
+    fl_log_info("fake log: [%d %s %5.2f %.*s %llu %%]", -42, "ok", 1.5, 3, "abcdef", 7ull);
+    fl_log_info("fake log: %d then %y then %d", 1, 2, 3);
+#endif
     return true;
 #endif
 }
