@@ -9,17 +9,14 @@ engines, not hardware, so no core will ever replace it.
 ## Unrostered
 
 ScummVM builds here but is not published: it stays out of every release plugin list and index until
-both criticals below are fixed, and nothing else waits on it.
+the critical below is fixed, and nothing else waits on it.
 
-- [#13](https://github.com/FPGAArcade/replay_frontend_plugins/issues/13): 47 of 48 engines are
-  unreachable. `generate_engines.sh` registers only SCUMM, so the rest are linked but never detected.
-  Fixing it means generating both engine tables from `ENABLED_ENGINES`.
 - [#14](https://github.com/FPGAArcade/replay_frontend_plugins/issues/14): data files are never
   installed. The engine-data files some engines need to start are not shipped, and
   `addSysArchivesToSearchSet` searches nowhere. Fixing it means a `scummvm-data` companion artifact
   and a search path pointing at it.
 
-Rostering means closing both, adding a `smoke.toml`, and adding `scummvm` to the published set.
+Rostering means closing it, adding a `smoke.toml`, and adding `scummvm` to the published set.
 
 ## Engines
 

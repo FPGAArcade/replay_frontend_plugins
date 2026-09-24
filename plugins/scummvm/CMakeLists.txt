@@ -15,48 +15,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(SCUMMVM_DIR ${CMAKE_CURRENT_SOURCE_DIR}/upstream)
 set(GENERATED_DIR ${CMAKE_CURRENT_BINARY_DIR}/generated)
 
-# Create generated directory
-file(MAKE_DIRECTORY ${GENERATED_DIR}/engines)
-
-#######################################################################
-# Generate engine configuration files
-#######################################################################
-
-# Run the engine generation script at configure time
-message(STATUS "Generating ScummVM engine configuration...")
-execute_process(
-    COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/generate_engines.sh
-            ${SCUMMVM_DIR} ${GENERATED_DIR}
-    WORKING_DIRECTORY ${SCUMMVM_DIR}
-    RESULT_VARIABLE ENGINE_GEN_RESULT
-    OUTPUT_VARIABLE ENGINE_GEN_OUTPUT
-    ERROR_VARIABLE ENGINE_GEN_ERROR
-)
-
-if(NOT ENGINE_GEN_RESULT EQUAL 0)
-    message(WARNING "Engine generation returned: ${ENGINE_GEN_RESULT}")
-    message(STATUS "Output: ${ENGINE_GEN_OUTPUT}")
-    message(STATUS "Error: ${ENGINE_GEN_ERROR}")
-    # Don't fail - we'll create stub files if needed
-endif()
-
-# Check if plugin tables were generated, create stubs if not
-if(NOT EXISTS ${GENERATED_DIR}/engines/plugins_table.h)
-    message(STATUS "Creating stub plugins_table.h")
-    file(WRITE ${GENERATED_DIR}/engines/plugins_table.h
-        "// Auto-generated stub - engine generation script didn't run\n"
-        "// Add LINK_PLUGIN entries here\n"
-    )
-endif()
-
-if(NOT EXISTS ${GENERATED_DIR}/engines/detection_table.h)
-    message(STATUS "Creating stub detection_table.h")
-    file(WRITE ${GENERATED_DIR}/engines/detection_table.h
-        "// Auto-generated stub - engine generation script didn't run\n"
-        "// Add LINK_PLUGIN entries here\n"
-    )
-endif()
-
 #######################################################################
 # Build libco as a static library
 #######################################################################
@@ -286,6 +244,19 @@ list(FILTER SCUMMVM_ENGINE_SOURCES EXCLUDE REGEX ".*/_template\\.cpp$")
 
 message(STATUS "Enabled ScummVM engines: ${ENGINE_NAMES}")
 
+# base/plugins.cpp registers exactly the engines these two tables list.
+set(PLUGINS_TABLE "")
+set(DETECTION_TABLE "")
+set(ENGINE_DEFINES "")
+foreach(ENGINE ${ENGINE_NAMES})
+    string(TOUPPER ${ENGINE} ENGINE_UPPER)
+    list(APPEND ENGINE_DEFINES "ENABLE_${ENGINE_UPPER}=1")
+    string(APPEND PLUGINS_TABLE "LINK_PLUGIN(${ENGINE_UPPER})\n")
+    string(APPEND DETECTION_TABLE "LINK_PLUGIN(${ENGINE_UPPER}_DETECTION)\n")
+endforeach()
+file(GENERATE OUTPUT ${GENERATED_DIR}/engines/plugins_table.h CONTENT "${PLUGINS_TABLE}")
+file(GENERATE OUTPUT ${GENERATED_DIR}/engines/detection_table.h CONTENT "${DETECTION_TABLE}")
+
 # Engine base sources (not in subdirectories)
 file(GLOB SCUMMVM_ENGINES_BASE ${SCUMMVM_DIR}/engines/*.cpp)
 
@@ -343,13 +314,6 @@ target_include_directories(scummvm_lib PUBLIC
     # Bundled libFLAC headers
     ${CMAKE_CURRENT_SOURCE_DIR}/external/libflac/include
 )
-
-# Generate ENABLE_* defines for all engines
-set(ENGINE_DEFINES "")
-foreach(ENGINE ${ENGINE_NAMES})
-    string(TOUPPER ${ENGINE} ENGINE_UPPER)
-    list(APPEND ENGINE_DEFINES "ENABLE_${ENGINE_UPPER}=1")
-endforeach()
 
 target_compile_definitions(scummvm_lib PUBLIC
     # Config
