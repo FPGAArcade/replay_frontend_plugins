@@ -7,8 +7,8 @@ it with `retrovert-updater`.
 
 | Channel | Base URL | Anchor | Status |
 | --- | --- | --- | --- |
-| `stable` | `https://github.com/FPGAArcade/replay_frontend_plugins/releases/download/stable/channel-metadata/` | `channels/stable/root.json` | not yet created |
-| `dev` | `https://github.com/FPGAArcade/replay_frontend_plugins/releases/download/dev/channel-metadata/` | `channels/dev/root.json` | not yet created |
+| `stable` | `https://github.com/FPGAArcade/replay_frontend_plugins/releases/download/stable/channel-metadata/` | `channels/stable/root.json` | live |
+| `dev` | `https://github.com/FPGAArcade/replay_frontend_plugins/releases/download/dev/channel-metadata/` | `channels/dev/root.json` | live |
 
 Devices follow `stable`. Developer desktops and the plugin canary follow `dev`.
 
