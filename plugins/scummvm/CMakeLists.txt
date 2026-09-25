@@ -446,10 +446,14 @@ add_replay_emu_plugin(NAME scummvm SOURCES scummvm_core.cpp)
 
 add_dependencies(scummvm scummvm_data)
 
+# On the glibc 2.28 the release toolchain links against, threads and dladdr are not in libc.
+find_package(Threads REQUIRED)
 target_link_libraries(scummvm PRIVATE
     scummvm_lib
     scummvm_libco
     flac_decoder
+    Threads::Threads
+    ${CMAKE_DL_LIBS}
 )
 
 target_include_directories(scummvm PRIVATE
