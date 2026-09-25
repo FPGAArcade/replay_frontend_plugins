@@ -582,6 +582,8 @@ inline void mesen2_run_frame(Mesen2CoreBase* core, RpEmuFrameContext* ctx) {
     if (core->renderer) {
         ctx->video_buffer = core->renderer->SwapAndGetFrameBuffer();
         ctx->video_pitch = core->renderer->GetFrameWidth() * sizeof(uint32_t);
+        ctx->video_width = core->renderer->GetFrameWidth();
+        ctx->video_height = core->renderer->GetFrameHeight();
 
         // Update video spec if resolution changed (hi-res modes, etc.)
         if (core->renderer->GetFrameWidth() != core->video_spec.width

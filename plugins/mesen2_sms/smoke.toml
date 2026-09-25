@@ -4,9 +4,6 @@
 # bytes of our own that put a two-colour pattern on screen; scripts/make_smoke_roms.py writes it.
 fixture = "smoke/smoke.sms"
 
-# Weaker than it looks: Mesen2 returns 256x240 with the 192 drawn lines centred, and the host's
-# 256x192 read takes in unwritten rows, so this passes even when the pattern is not drawn.
-
 # Five seconds of the machine's own time.
 frames = 300
 

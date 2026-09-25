@@ -8,6 +8,8 @@
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // SMS system configuration
 
+#define SMS_MESEN2_FRAME_HEIGHT 240
+
 static const Mesen2SystemInfo s_sms_info = {
     .emu_name = "Mesen2",
     .system_name = "Sega Master System / Game Gear",
@@ -36,7 +38,18 @@ static void mesen2_sms_get_info(RpEmuInfo* info) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 static void* mesen2_sms_create(FlArena* arena) {
-    return mesen2_create_core(arena, s_sms_info, "SMS/Game Gear");
+    Mesen2CoreBase* core = mesen2_create_core(arena, s_sms_info, "SMS/Game Gear");
+    if (core) {
+        // Mesen2's UI crop: the 192 drawn lines are centred in a 240-line frame.
+        const uint32_t border_lines = (SMS_MESEN2_FRAME_HEIGHT - s_sms_info.default_height) / 2;
+        EmuSettings* settings = core->emulator->GetSettings();
+        SmsConfig config = settings->GetSmsConfig();
+        config.NtscOverscan.Top = border_lines;
+        config.NtscOverscan.Bottom = border_lines;
+        config.PalOverscan = config.NtscOverscan;
+        settings->SetSmsConfig(config);
+    }
+    return core;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

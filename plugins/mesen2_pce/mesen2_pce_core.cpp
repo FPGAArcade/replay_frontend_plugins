@@ -4,6 +4,7 @@
 
 #include "mesen2_shared.h"
 #include "Core/PCE/PceConsole.h"
+#include "Core/PCE/PceConstants.h"
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // PC Engine system configuration
@@ -14,13 +15,13 @@ static const Mesen2SystemInfo s_pce_info = {
     .extensions = "pce|sgx|cue|hes",
     .requires_bios = false,
     .default_width = 256,
-    .default_height = 240,
+    .default_height = 239,
     .default_fps = 59.94f,
     .cpu_type = CpuType::Pce,
     .visible_x = 0,
     .visible_y = 0,
     .visible_width = 256,
-    .visible_height = 240,
+    .visible_height = 239,
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -105,6 +106,11 @@ static void* mesen2_pce_create(FlArena* arena) {
         EmuSettings* settings = core->emulator->GetSettings();
         PcEngineConfig config = settings->GetPcEngineConfig();
         memcpy(config.Palette, s_pce_default_palette, sizeof(config.Palette));
+        // Mesen2's UI crop, which the core also leaves to the UI: the 292x242 frame becomes the
+        // spec's 256x239 drawn area.
+        config.Overscan.Left = PceConstants::RowOverscanSize;
+        config.Overscan.Right = PceConstants::RowOverscanSize;
+        config.Overscan.Top = PceConstants::ScreenHeight - s_pce_info.default_height;
         settings->SetPcEngineConfig(config);
     }
     return core;

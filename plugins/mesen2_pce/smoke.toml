@@ -4,9 +4,6 @@
 # bytes of our own that put a two-colour pattern on screen; scripts/make_smoke_roms.py writes it.
 fixture = "smoke/smoke.pce"
 
-# Weaker than it looks: the host checks the spec's 256x240 corner of a 292x242 frame, whose overscan
-# border differs from the backdrop, so this passes even when the pattern is not drawn.
-
 # Five seconds of the machine's own time.
 frames = 300
 
