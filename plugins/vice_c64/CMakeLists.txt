@@ -11,7 +11,8 @@ set_target_properties(vice_c64_lib PROPERTIES
     C_COMPILER_LAUNCHER "${CMAKE_COMMAND};-E;env;SOURCE_DATE_EPOCH=0")
 
 add_replay_emu_plugin(NAME vice_c64 SOURCES vice_c64_core.c)
-target_link_libraries(vice_c64 PRIVATE vice_c64_lib)
+# dladdr is in libdl, not libc, on the glibc 2.28 the release toolchain links against.
+target_link_libraries(vice_c64 PRIVATE vice_c64_lib ${CMAKE_DL_LIBS})
 target_include_directories(vice_c64 PRIVATE
     upstream
     upstream/libretro

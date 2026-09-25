@@ -48,6 +48,8 @@ add_subdirectory(external/libflac)
 # Core ScummVM sources
 file(GLOB_RECURSE SCUMMVM_BASE_SOURCES ${SCUMMVM_DIR}/base/*.cpp)
 file(GLOB_RECURSE SCUMMVM_COMMON_SOURCES ${SCUMMVM_DIR}/common/*.cpp)
+# Upstream builds zlib.cpp only with USE_ZLIB; without it gzio.cpp is the inflater.
+list(FILTER SCUMMVM_COMMON_SOURCES EXCLUDE REGEX ".*/compression/zlib\\.cpp$")
 file(GLOB_RECURSE SCUMMVM_GRAPHICS_SOURCES ${SCUMMVM_DIR}/graphics/*.cpp)
 file(GLOB_RECURSE SCUMMVM_IMAGE_SOURCES ${SCUMMVM_DIR}/image/*.cpp)
 # Exclude image codecs that need external libraries
@@ -449,13 +451,6 @@ target_link_libraries(scummvm PRIVATE
     scummvm_libco
     flac_decoder
 )
-
-# Cross-compilation needs explicit zlib linkage (sysroot headers removed)
-if(CMAKE_CROSSCOMPILING)
-    find_package(ZLIB REQUIRED)
-    target_include_directories(scummvm_lib PUBLIC ${ZLIB_INCLUDE_DIRS})
-    target_link_libraries(scummvm PRIVATE ZLIB::ZLIB)
-endif()
 
 target_include_directories(scummvm PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
