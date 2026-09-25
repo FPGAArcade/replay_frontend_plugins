@@ -1,0 +1,103 @@
+# A <channel>/vN tag: gather the plugin releases the channel's roster pins, check each was built
+# and validated by plugin-release.yml from its tag, stage the set on the tag's release, then hand
+# the manifest digest to channel-publish.yml, whose metadata write is the commit point. Nothing is
+# built here, so a plugin whose pin did not change carries the same bytes into the new generation.
+# See channels/RELEASING.md.
+name: Release
+
+on:
+  push:
+    tags:
+      - 'dev/v*'
+      - 'stable/v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      actions: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Parse the tag
+        run: |
+          if [[ ! "$GITHUB_REF_NAME" =~ ^(dev|stable)/v([1-9][0-9]*)$ ]]; then
+            echo "::error::tag '$GITHUB_REF_NAME' is not <channel>/vN"
+            exit 1
+          fi
+          echo "CHANNEL=${BASH_REMATCH[1]}" >> "$GITHUB_ENV"
+          echo "VERSION=${BASH_REMATCH[2]}" >> "$GITHUB_ENV"
+
+      # Every tag, so each pin resolves to the commit it was built from.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Gather the pinned plugins
+        run: |
+          set -euo pipefail
+          mkdir -p set entries
+          scripts/release.py roster "$CHANNEL" > pins
+          while read -r plugin version; do
+            tag="$plugin/v$version"
+            for name in "$plugin-linux-x86_64.tar.zst" "$plugin-linux-arm64.tar.zst" "$plugin.json"; do
+              dir=set
+              if [[ $name == *.json ]]; then dir=entries; fi
+              if ! gh release download "$tag" --pattern "$name" --dir "$dir"; then
+                echo "::error::the roster pins $tag, which has no released $name; tag the plugin first"
+                exit 1
+              fi
+              gh attestation verify "$dir/$name" --repo "$GITHUB_REPOSITORY" \
+                --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/plugin-release.yml" \
+                --source-ref "refs/tags/$tag" > /dev/null
+            done
+            echo "$tag"
+          done < pins
+
+      - name: Index and manifest
+        run: |
+          scripts/release.py index --channel "$CHANNEL" --entries entries --out set/plugin-index.json
+          digest=$(scripts/release.py manifest --channel "$CHANNEL" --version "$VERSION" --artifacts set --out set/manifest.json)
+          echo "MANIFEST_SHA256=$digest" >> "$GITHUB_ENV"
+
+      - name: Stage the release set
+        run: |
+          prerelease=--prerelease
+          if [ "$CHANNEL" = stable ]; then prerelease=; fi
+          scripts/stage_release.sh $prerelease "$GITHUB_REF_NAME" \
+            "Release set $CHANNEL/v$VERSION. Authenticated by the channel's signed manifest; assets here are not individually trusted." \
+            set/*
+
+      - name: Hand off to the signer
+        run: |
+          set -euo pipefail
+          started=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          gh workflow run channel-publish.yml --ref main \
+            -f "channel=$CHANNEL" -f "version=$VERSION" -f "manifest_sha256=$MANIFEST_SHA256"
+
+          # The signer's run title carries the digest, so this cannot pick up another dispatch.
+          run_id=""
+          for _ in $(seq 1 30); do
+            sleep 10
+            run_id=$(gh run list --workflow channel-publish.yml --event workflow_dispatch \
+              --created ">=$started" --limit 20 --json databaseId,displayTitle \
+              --jq ".[] | select(.displayTitle | contains(\"$MANIFEST_SHA256\")) | .databaseId" | head -1)
+            if [ -n "$run_id" ]; then break; fi
+          done
+          if [ -z "$run_id" ]; then
+            echo "::error::the signer run did not appear within five minutes"
+            exit 1
+          fi
+          if ! gh run watch "$run_id" --exit-status --interval 15; then
+            echo "::error::the signer failed; see channels/RELEASING.md before re-running"
+            exit 1
+          fi
+          echo "\`$CHANNEL/v$VERSION\` is live; manifest \`$MANIFEST_SHA256\`." >> "$GITHUB_STEP_SUMMARY"

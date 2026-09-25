@@ -1,0 +1,14 @@
+# The plugin versions a dev/vN tag publishes. Each is the <plugin>/vX.Y.Z release of that plugin;
+# a dev/vN tag builds nothing, it gathers these.
+[plugins]
+mesen2_gb = "1.0.0"
+mesen2_gba = "1.0.0"
+mesen2_nes = "1.0.0"
+mesen2_pce = "1.0.0"
+mesen2_sms = "1.0.0"
+mesen2_snes = "1.0.0"
+mesen2_ws = "1.0.0"
+scummvm = "1.0.0"
+stub = "1.0.0"
+vamiga = "1.0.0"
+vice_c64 = "1.0.0"

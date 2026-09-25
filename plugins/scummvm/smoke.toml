@@ -1,0 +1,11 @@
+# The smoke run for this plugin: ./build.sh scummvm --smoke.
+
+# Lure of the Temptress, freeware; the fixture names the game, the directory holds its disks.
+fixture = "smoke/lure/lure.scummvm"
+
+frames = 600
+
+# The watchdog, not a budget.
+timeout_seconds = 60
+
+audio = false

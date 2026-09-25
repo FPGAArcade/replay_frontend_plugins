@@ -46,9 +46,11 @@ Ported glue keeps upstream's style; new code follows the project conventions.
 smoke/selftest.sh
 scripts/upstream_selftest.sh
 scripts/publish_gate_selftest.sh
+scripts/release_selftest.sh
 ```
 
-Update channels are described in [`channels/`](channels/README.md).
+Update channels are described in [`channels/`](channels/README.md); releasing to them in
+[`channels/RELEASING.md`](channels/RELEASING.md).
 
 ## Licensing
 

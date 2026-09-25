@@ -51,6 +51,9 @@ jobs:
       - name: The publish gate's own tests
         run: ./scripts/publish_gate_selftest.sh
 
+      - name: The release packer's own tests
+        run: ./scripts/release_selftest.sh
+
   anchors:
     name: Channel anchors
     runs-on: ubuntu-24.04

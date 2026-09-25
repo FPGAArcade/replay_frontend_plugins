@@ -16,6 +16,7 @@ Devices follow `stable`. Developer desktops and the plugin canary follow `dev`.
 | --- | --- | --- |
 | `<channel>/channel-metadata` | TUF metadata and release-set manifests; its flat asset namespace is the base URL | `timestamp.json` replaced on every publish; everything else immutable |
 | `<channel>/vN` | one release set: manifest, plugin index, plugin artifacts | immutable |
+| `<plugin>/vX.Y.Z` | one plugin release: its archive for each target and its index entry, with build provenance | immutable |
 
 Generations are monotonic `vN`, latest-only, roll-forward-only.
 
@@ -44,7 +45,9 @@ $ retrovert-publish check workspace
 
 | Workflow | Trigger | Does |
 | --- | --- | --- |
-| [`channel-publish.yml`](../.github/workflows/channel-publish.yml) | dispatched by the gather with `channel`, `version`, `manifest_sha256` | pulls the live chain, refuses a version that is not newer, fetches the manifest by digest, publishes metadata with `timestamp.json` last, reads it back |
+| [`plugin-release.yml`](../.github/workflows/plugin-release.yml) | a `<plugin>/vX.Y.Z` tag push | builds, validates and stores one plugin release; see [`RELEASING.md`](RELEASING.md) |
+| [`release.yml`](../.github/workflows/release.yml) | a `<channel>/vN` tag push | gathers the plugin releases the roster pins, stages the set, then dispatches `channel-publish.yml` |
+| [`channel-publish.yml`](../.github/workflows/channel-publish.yml) | dispatched by `release.yml` with `channel`, `version`, `manifest_sha256` | pulls the live chain, refuses a version that is not newer, fetches the manifest by digest, publishes metadata with `timestamp.json` last, reads it back |
 | [`channel-resign.yml`](../.github/workflows/channel-resign.yml) | 1st of each month 04:23 UTC, or dispatch | re-signs every online role of every committed channel, fails unless every expiry moved, reads it back |
 | `ci.yml`, job *Channel anchors* | push, PR | parses every anchor, checks signatures meet threshold, warns 180 days before root expiry |
 
