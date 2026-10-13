@@ -45,21 +45,43 @@ typedef u64 (*RpEmuPluginAbiVersionFunc)(void);
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// The vtable slots <replay/plugin/emu_plugin_types.h> does not document as optional. A plugin
-// missing one of these is not one the frontend could drive.
+// The vtable slots a plugin must fill: the ones this host calls, plus the ones each RpEmuCapability the plugin sets
+// names. The frontend refuses a plugin that sets a capability without its slots, so this host does too.
 typedef struct RequiredSlot {
     const char* name;
     size_t offset;
+    // The capability that requires the slot; 0 for a slot every plugin needs.
+    u32 capability;
 } RequiredSlot;
 
-#define REQUIRED_SLOT(field) { #field, offsetof(RpEmuAPI, field) }
+#define REQUIRED_SLOT(field) { #field, offsetof(RpEmuAPI, field), 0 }
+#define CAPABILITY_SLOT(capability, field) { #field, offsetof(RpEmuAPI, field), capability }
 
 static const RequiredSlot s_required_slots[] = {
-    REQUIRED_SLOT(get_info),       REQUIRED_SLOT(create),         REQUIRED_SLOT(destroy),   REQUIRED_SLOT(mount_media),
-    REQUIRED_SLOT(unmount_media),  REQUIRED_SLOT(run_frame),      REQUIRED_SLOT(reset),     REQUIRED_SLOT(hard_reset),
-    REQUIRED_SLOT(get_video_spec), REQUIRED_SLOT(get_audio_spec), REQUIRED_SLOT(get_state),
+    REQUIRED_SLOT(get_info),
+    REQUIRED_SLOT(create),
+    REQUIRED_SLOT(destroy),
+    REQUIRED_SLOT(mount_media),
+    REQUIRED_SLOT(unmount_media),
+    REQUIRED_SLOT(run_frame),
+    REQUIRED_SLOT(get_video_spec),
+    REQUIRED_SLOT(get_audio_spec),
+    REQUIRED_SLOT(get_state),
+    CAPABILITY_SLOT(RpEmuCapability_SaveState, serialize),
+    CAPABILITY_SLOT(RpEmuCapability_SaveState, deserialize),
+    CAPABILITY_SLOT(RpEmuCapability_SoftReset, reset),
+    CAPABILITY_SLOT(RpEmuCapability_HardReset, hard_reset),
+    CAPABILITY_SLOT(RpEmuCapability_Media, get_media_slots),
+    CAPABILITY_SLOT(RpEmuCapability_Media, set_media),
+    CAPABILITY_SLOT(RpEmuCapability_Media, next_side),
+    CAPABILITY_SLOT(RpEmuCapability_DipSwitches, set_config_bitmask),
 };
 
+#define SMOKE_KNOWN_CAPABILITIES                                                                                      \
+    (RpEmuCapability_SaveState | RpEmuCapability_SoftReset | RpEmuCapability_HardReset | RpEmuCapability_Media |      \
+     RpEmuCapability_DipSwitches)
+
+#undef CAPABILITY_SLOT
 #undef REQUIRED_SLOT
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -170,6 +192,33 @@ static bool audio_has_signal(const RpEmuFrameContext* ctx, const RpAudioSpec* sp
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// The Actions a plugin declares must be ones a core is fed: never Menu, which the host keeps, and never a value past
+// the vocabulary. A list that claims entries must exist. The frontend refuses a plugin that breaks either.
+static bool declared_actions_ok(const char* path, const RpEmuInfo* info) {
+    if ((info->digital_action_count > 0 && !info->digital_actions) ||
+        (info->analog_action_count > 0 && !info->analog_actions)) {
+        fprintf(stderr, "smoke: FAIL - %s declares Actions through a null list\n", path);
+        return false;
+    }
+    for (u32 i = 0; i < info->digital_action_count; i++) {
+        if ((u32)info->digital_actions[i].action >= RP_EMU_DIGITAL_ACTIONS) {
+            fprintf(stderr, "smoke: FAIL - %s declares digital Action %u, which a core is not fed\n", path,
+                    (u32)info->digital_actions[i].action);
+            return false;
+        }
+    }
+    for (u32 i = 0; i < info->analog_action_count; i++) {
+        if ((u32)info->analog_actions[i].action >= RP_EMU_ANALOG_ACTIONS) {
+            fprintf(stderr, "smoke: FAIL - %s declares analog Action %u, which a core is not fed\n", path,
+                    (u32)info->analog_actions[i].action);
+            return false;
+        }
+    }
+    return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // RTLD_NOW for a smoke: a call this host does not implement then fails here, with the symbol named,
 // instead of crashing in the middle of a frame. Lazy for --load-only, because this host implements
 // only what smoked plugins call; the gate checks imports against the real host's export list.
@@ -213,20 +262,59 @@ static const RpEmuAPI* load_plugin(const char* path, int bind_mode) {
         return nullptr;
     }
 
-    bool complete = true;
-    for (size_t i = 0; i < sizeof(s_required_slots) / sizeof(s_required_slots[0]); i++) {
-        const void* slot = *(void* const*)((const u8*)api + s_required_slots[i].offset);
-        if (!slot) {
-            fprintf(stderr, "smoke: FAIL - %s leaves the required slot '%s' empty\n", path, s_required_slots[i].name);
-            complete = false;
-        }
+    if (!api->get_info) {
+        fprintf(stderr, "smoke: FAIL - %s leaves the required slot 'get_info' empty\n", path);
+        return nullptr;
     }
-    return complete ? api : nullptr;
+    RpEmuInfo info = { 0 };
+    api->get_info(&info);
+
+    bool complete = true;
+    const u32 unknown = info.capabilities & ~(u32)SMOKE_KNOWN_CAPABILITIES;
+    if (unknown != 0) {
+        fprintf(stderr, "smoke: FAIL - %s sets unknown capability bits 0x%x\n", path, unknown);
+        complete = false;
+    }
+    for (size_t i = 0; i < sizeof(s_required_slots) / sizeof(s_required_slots[0]); i++) {
+        const RequiredSlot* required = &s_required_slots[i];
+        const bool needed = required->capability == 0 || (info.capabilities & required->capability) != 0;
+        if (!needed || *(void* const*)((const u8*)api + required->offset)) {
+            continue;
+        }
+        if (required->capability == 0) {
+            fprintf(stderr, "smoke: FAIL - %s leaves the required slot '%s' empty\n", path, required->name);
+        } else {
+            const FlString label = rp_emu_capability_label((RpEmuCapability)required->capability);
+            fprintf(stderr, "smoke: FAIL - %s sets capability '%.*s' without its slot '%s'\n", path, (int)label.length,
+                    label.data, required->name);
+        }
+        complete = false;
+    }
+    return complete && declared_actions_ok(path, &info) ? api : nullptr;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static bool run_frames(const RpEmuAPI* api, void* instance, const SmokeConfig* config) {
+// FNV-1a over the visible pixels, so two runs can be compared: the same plugin fed different input should differ.
+#define SMOKE_FNV_OFFSET 0xcbf29ce484222325ull
+#define SMOKE_FNV_PRIME 0x100000001b3ull
+
+static u64 framebuffer_hash(const RpEmuFrameContext* ctx, const FrameGeometry* geometry) {
+    const u8* base = (const u8*)ctx->video_buffer;
+    u64 hash = SMOKE_FNV_OFFSET;
+    for (u32 y = 0; y < geometry->height; y++) {
+        const u8* row = base + ((size_t)y * geometry->pitch);
+        for (size_t i = 0; i < (size_t)geometry->width * geometry->pixel_size; i++) {
+            hash = (hash ^ row[i]) * SMOKE_FNV_PRIME;
+        }
+    }
+    return hash;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// hold_action: Port 1 holds RpDigitalAction_Action for every frame; otherwise every Port is idle.
+static bool run_frames(const RpEmuAPI* api, void* instance, const SmokeConfig* config, bool hold_action) {
     RpVideoSpec video = { 0 };
     RpAudioSpec audio = { 0 };
     api->get_video_spec(instance, &video);
@@ -237,9 +325,11 @@ static bool run_frames(const RpEmuAPI* api, void* instance, const SmokeConfig* c
         return false;
     }
 
-    const RpEmuInputState input = { 0 };
+    RpEmuInputState input = { 0 };
+    input.ports[0].digital[RpDigitalAction_Action] = hold_action;
     const double delta_time = video.fps > 0.0f ? 1.0 / (double)video.fps : 0.0;
     bool blank_final_frame = true;
+    u64 final_frame_hash = 0;
     bool heard_audio = false;
 
     for (u32 frame = 0; frame < config->frames; frame++) {
@@ -257,6 +347,7 @@ static bool run_frames(const RpEmuAPI* api, void* instance, const SmokeConfig* c
             return false;
         }
         blank_final_frame = framebuffer_is_blank(&ctx, &geometry);
+        final_frame_hash = framebuffer_hash(&ctx, &geometry);
         heard_audio = heard_audio || audio_has_signal(&ctx, &audio);
 
         // Wait out the frame the plugin says it just produced. A core that steps its emulation
@@ -275,6 +366,7 @@ static bool run_frames(const RpEmuAPI* api, void* instance, const SmokeConfig* c
     }
 
     printf("smoke: ran %u frames at %ux%u\n", config->frames, video.width, video.height);
+    printf("smoke: final frame hash %016llx\n", (unsigned long long)final_frame_hash);
 
     if (blank_final_frame) {
         fprintf(stderr, "smoke: FAIL - frame %u is blank: every pixel carries the same value\n", config->frames - 1);
@@ -289,11 +381,13 @@ static bool run_frames(const RpEmuAPI* api, void* instance, const SmokeConfig* c
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static bool run_smoke(const RpEmuAPI* api, const SmokeConfig* config) {
+static bool run_smoke(const RpEmuAPI* api, const SmokeConfig* config, bool hold_action) {
     RpEmuInfo info = { 0 };
     api->get_info(&info);
     printf("smoke: %s %s (%s)\n", info.emu_name ? info.emu_name : "?", info.emu_version ? info.emu_version : "?",
            info.system_name ? info.system_name : "?");
+    printf("smoke: capabilities 0x%x, %u digital and %u analog Actions declared\n", info.capabilities,
+           info.digital_action_count, info.analog_action_count);
 
     void* instance = api->create(smoke_host_arena());
     if (!instance) {
@@ -309,7 +403,11 @@ static bool run_smoke(const RpEmuAPI* api, const SmokeConfig* config) {
     if (!ok) {
         fprintf(stderr, "smoke: FAIL - the plugin refused %s\n", fixture ? fixture : "booting with no fixture");
     } else {
-        ok = run_frames(api, instance, config);
+        // A plugin declaring DIP switches has that slot called once, with every switch off.
+        if (info.capabilities & RpEmuCapability_DipSwitches) {
+            api->set_config_bitmask(instance, 0);
+        }
+        ok = run_frames(api, instance, config, hold_action);
         api->unmount_media(instance);
     }
 
@@ -320,13 +418,14 @@ static bool run_smoke(const RpEmuAPI* api, const SmokeConfig* config) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 static void usage(void) {
-    fprintf(stderr, "usage: replay_smoke <plugin.so> <smoke.toml> [--plugin-log]\n"
+    fprintf(stderr, "usage: replay_smoke <plugin.so> <smoke.toml> [--plugin-log] [--hold-action]\n"
                     "       replay_smoke <plugin.so> --load-only\n"
                     "\n"
                     "Loads a built emulator plugin, mounts the fixture smoke.toml names (or boots with\n"
                     "none when it names no fixture), runs its frames,\n"
                     "and fails unless the plugin is still running with a framebuffer that is not blank.\n"
                     "  --plugin-log   also print what the plugin logs\n"
+                    "  --hold-action  hold Action on Port 1 for every frame\n"
                     "  --load-only    load and check the plugin's ABI version and vtable, run nothing\n");
 }
 
@@ -336,10 +435,13 @@ int main(int argc, char** argv) {
     const char* plugin_path = nullptr;
     const char* config_path = nullptr;
     bool load_only = false;
+    bool hold_action = false;
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--plugin-log") == 0) {
             smoke_host_set_plugin_logging(true);
+        } else if (strcmp(argv[i], "--hold-action") == 0) {
+            hold_action = true;
         } else if (strcmp(argv[i], "--load-only") == 0) {
             load_only = true;
         } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
@@ -384,7 +486,7 @@ int main(int argc, char** argv) {
 
     signal(SIGALRM, on_timeout);
     alarm(config.timeout_seconds);
-    const bool ok = run_smoke(api, &config);
+    const bool ok = run_smoke(api, &config, hold_action);
     alarm(0);
 
     printf("smoke: %s - %s\n", ok ? "PASS" : "FAIL", plugin_path);

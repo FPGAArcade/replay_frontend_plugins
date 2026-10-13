@@ -31,6 +31,7 @@ static void mesen2_gb_get_info(RpEmuInfo* info) {
     info->system_name = s_gb_info.system_name;
     info->supported_extensions = s_gb_info.extensions;
     info->requires_bios = s_gb_info.requires_bios;
+    mesen2_get_info_common(info, ConsoleType::Gameboy);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

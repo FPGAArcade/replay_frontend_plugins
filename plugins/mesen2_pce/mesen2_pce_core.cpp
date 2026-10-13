@@ -32,6 +32,7 @@ static void mesen2_pce_get_info(RpEmuInfo* info) {
     info->system_name = s_pce_info.system_name;
     info->supported_extensions = s_pce_info.extensions;
     info->requires_bios = s_pce_info.requires_bios;
+    mesen2_get_info_common(info, ConsoleType::PcEngine);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -104,6 +104,9 @@ static void vamiga_get_info(RpEmuInfo* info) {
     info->system_name = "Commodore Amiga";
     info->supported_extensions = "adf|adz|dms|hdf|hdz";
     info->requires_bios = false; // HLE ROM fallback when no Kickstart ROM available
+    // Hard reset only: vAmiga's soft reset trips an assertion in Paula, so vamiga_reset() power cycles too.
+    // No Actions are declared because run_frame does not read input yet.
+    info->capabilities = RpEmuCapability_HardReset;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

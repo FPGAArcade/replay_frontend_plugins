@@ -22,6 +22,8 @@
 #define STUB_CHANNELS 2
 // One video frame's worth of audio, which divides exactly at these two rates.
 #define STUB_FRAMES_PER_CALL (STUB_SAMPLE_RATE / STUB_FPS)
+// Every blue bit, flipped while Port 1 holds Action.
+#define STUB_BLUE_MASK 0xffu
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -36,12 +38,21 @@ typedef struct StubEmu {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+static const RpEmuDigitalActionLabel s_stub_digital_actions[] = {
+    { RpDigitalAction_Action, "Fire" },
+};
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 static void stub_get_info(RpEmuInfo* info) {
     info->emu_name = "Stub";
     info->emu_version = "1.0";
     info->system_name = "Stub System";
     info->supported_extensions = "stub";
     info->requires_bios = false;
+    info->capabilities = RpEmuCapability_SoftReset | RpEmuCapability_HardReset;
+    info->digital_actions = s_stub_digital_actions;
+    info->digital_action_count = (u32)(sizeof(s_stub_digital_actions) / sizeof(s_stub_digital_actions[0]));
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -82,13 +93,16 @@ static void stub_unmount_media(void* instance) {
 static void stub_run_frame(void* instance, RpEmuFrameContext* ctx) {
     StubEmu* emu = (StubEmu*)instance;
 
+    // Fire inverts the blue channel, so input arriving from the host is visible.
+    const u32 blue_flip = ctx->input->ports[0].digital[RpDigitalAction_Action] ? STUB_BLUE_MASK : 0;
+
     // A diagonal gradient scrolling with the frame counter: every channel varies across both axes
     // and over time, so a stuck row, column or frame shows up as a byte difference.
     for (u32 y = 0; y < STUB_HEIGHT; y++) {
         for (u32 x = 0; x < STUB_WIDTH; x++) {
             const u32 red = (x + emu->frame_index) & 0xff;
             const u32 green = (y + emu->frame_index) & 0xff;
-            const u32 blue = (x + y + emu->frame_index) & 0xff;
+            const u32 blue = ((x + y + emu->frame_index) & 0xff) ^ blue_flip;
             emu->pixels[(y * STUB_WIDTH) + x] = (red << 16) | (green << 8) | blue;
         }
     }
@@ -113,17 +127,11 @@ static void stub_run_frame(void* instance, RpEmuFrameContext* ctx) {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// Both the warm boot and the power cycle: the frame counter is the stub's only machine state, and the
+// mounted media stays mounted through either.
 static void stub_reset(void* instance) {
     StubEmu* emu = (StubEmu*)instance;
     emu->frame_index = 0;
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-static void stub_hard_reset(void* instance) {
-    StubEmu* emu = (StubEmu*)instance;
-    emu->frame_index = 0;
-    emu->media_mounted = false;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -165,7 +173,7 @@ static RpEmuAPI s_stub_api = {
     .unmount_media = stub_unmount_media,
     .run_frame = stub_run_frame,
     .reset = stub_reset,
-    .hard_reset = stub_hard_reset,
+    .hard_reset = stub_reset,
     .get_video_spec = stub_get_video_spec,
     .get_audio_spec = stub_get_audio_spec,
     .get_state = stub_get_state,

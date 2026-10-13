@@ -31,6 +31,7 @@ static void mesen2_snes_get_info(RpEmuInfo* info) {
     info->system_name = s_snes_info.system_name;
     info->supported_extensions = s_snes_info.extensions;
     info->requires_bios = s_snes_info.requires_bios;
+    mesen2_get_info_common(info, ConsoleType::Snes);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -85,6 +85,19 @@ extern unsigned int retro_region;
 
 static const RpEmuInputState* g_current_input = nullptr;
 
+// Replay's Port 1 drives the C64's joystick port 2, the one most games read, which libretro numbers 1.
+#define VICE_REPLAY_JOYSTICK_PORT 0
+#define VICE_LIBRETRO_JOYSTICK_PORT 1
+
+static const RpEmuDigitalActionLabel s_vice_digital_actions[] = {
+    { RpDigitalAction_Up, "Up" },
+    { RpDigitalAction_Down, "Down" },
+    { RpDigitalAction_Left, "Left" },
+    { RpDigitalAction_Right, "Right" },
+    { RpDigitalAction_Action, "Fire" },
+    { RpDigitalAction_Secondary, "Fire" },
+};
+
 // Audio buffer - ~2 frames worth at 44100Hz/50fps = ~1764 samples/frame, stereo = 3528 floats
 #define AUDIO_BUFFER_MAX_FRAMES 4096
 static float g_audio_buffer[AUDIO_BUFFER_MAX_FRAMES * 2];
@@ -357,33 +370,24 @@ static void vice_input_poll(void) {
 static int16_t vice_input_state(unsigned port, unsigned device, unsigned index, unsigned id) {
     (void)index;
 
-    // Only handle joypad on port 1 (C64 joystick port 2, which is the common gaming port)
-    if (device != RETRO_DEVICE_JOYPAD || port != 1) {
+    if (device != RETRO_DEVICE_JOYPAD || port != VICE_LIBRETRO_JOYSTICK_PORT || !g_current_input) {
         return 0;
     }
 
-    if (!g_current_input) {
-        return 0;
-    }
-
-    // Map libretro joypad IDs to RpEmuButton
+    const bool* held = g_current_input->ports[VICE_REPLAY_JOYSTICK_PORT].digital;
     switch (id) {
         case RETRO_DEVICE_ID_JOYPAD_UP:
-            return g_current_input->buttons[RpEmuButton_Up] ? 1 : 0;
+            return held[RpDigitalAction_Up];
         case RETRO_DEVICE_ID_JOYPAD_DOWN:
-            return g_current_input->buttons[RpEmuButton_Down] ? 1 : 0;
+            return held[RpDigitalAction_Down];
         case RETRO_DEVICE_ID_JOYPAD_LEFT:
-            return g_current_input->buttons[RpEmuButton_Left] ? 1 : 0;
+            return held[RpDigitalAction_Left];
         case RETRO_DEVICE_ID_JOYPAD_RIGHT:
-            return g_current_input->buttons[RpEmuButton_Right] ? 1 : 0;
+            return held[RpDigitalAction_Right];
         case RETRO_DEVICE_ID_JOYPAD_A:
         case RETRO_DEVICE_ID_JOYPAD_B:
-            // C64 joystick has one fire button - map both A and B to it
-            return (g_current_input->buttons[RpEmuButton_A] || g_current_input->buttons[RpEmuButton_B]) ? 1 : 0;
-        case RETRO_DEVICE_ID_JOYPAD_START:
-            return g_current_input->buttons[RpEmuButton_Start] ? 1 : 0;
-        case RETRO_DEVICE_ID_JOYPAD_SELECT:
-            return g_current_input->buttons[RpEmuButton_Select] ? 1 : 0;
+            // The C64 joystick has one fire button, and both Actions press it.
+            return held[RpDigitalAction_Action] || held[RpDigitalAction_Secondary];
         default:
             return 0;
     }
@@ -552,6 +556,9 @@ static void vice_c64_get_info(RpEmuInfo* info) {
     info->system_name = "Commodore 64";
     info->supported_extensions = "d64|d71|d80|d81|d82|g64|g41|x64|t64|tap|prg|p00|crt|bin|m3u|vsf|nib|nbz";
     info->requires_bios = false;
+    info->capabilities = RpEmuCapability_HardReset | RpEmuCapability_SaveState;
+    info->digital_actions = s_vice_digital_actions;
+    info->digital_action_count = (u32)(sizeof(s_vice_digital_actions) / sizeof(s_vice_digital_actions[0]));
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

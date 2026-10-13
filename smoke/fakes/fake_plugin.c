@@ -12,6 +12,8 @@
 //   FAKE_ABI     reports an ABI version that is not this one
 //   FAKE_NOABI   exports no ABI version at all
 //   FAKE_NOSLOT  leaves a required vtable slot empty
+//   FAKE_NOCAP   sets a capability without the slots it needs
+//   FAKE_MENU    declares the host-reserved Menu Action
 //   FAKE_SILENT  runs correctly but emits no audio, so it passes a smoke that does not assert
 //                audio and fails one that does
 //   FAKE_NOMEDIA accepts only a null media path, the way a machine that boots from its own ROM
@@ -30,9 +32,10 @@
 #include <replay/plugin_info.h>
 
 #if !defined(FAKE_HANG) && !defined(FAKE_BLANK) && !defined(FAKE_ERROR) && !defined(FAKE_ABI) && \
-    !defined(FAKE_NOABI) && !defined(FAKE_NOSLOT) && !defined(FAKE_SILENT) && !defined(FAKE_NOMEDIA) && \
-    !defined(FAKE_STRINGS) && !defined(FAKE_LOG) && !defined(FAKE_EXPORT) && !defined(FAKE_IMPORT)
-#error "define one of FAKE_HANG, FAKE_BLANK, FAKE_ERROR, FAKE_ABI, FAKE_NOABI, FAKE_NOSLOT, FAKE_SILENT, FAKE_NOMEDIA, FAKE_STRINGS, FAKE_LOG, FAKE_EXPORT or FAKE_IMPORT"
+    !defined(FAKE_NOABI) && !defined(FAKE_NOSLOT) && !defined(FAKE_NOCAP) && !defined(FAKE_MENU) && \
+    !defined(FAKE_SILENT) && !defined(FAKE_NOMEDIA) && !defined(FAKE_STRINGS) && !defined(FAKE_LOG) && \
+    !defined(FAKE_EXPORT) && !defined(FAKE_IMPORT)
+#error "define one of FAKE_HANG, FAKE_BLANK, FAKE_ERROR, FAKE_ABI, FAKE_NOABI, FAKE_NOSLOT, FAKE_NOCAP, FAKE_MENU, FAKE_SILENT, FAKE_NOMEDIA, FAKE_STRINGS, FAKE_LOG, FAKE_EXPORT or FAKE_IMPORT"
 #endif
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -51,12 +54,25 @@ typedef struct FakeEmu {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#if defined(FAKE_MENU)
+static const RpEmuDigitalActionLabel s_fake_digital_actions[] = {
+    { RpDigitalAction_Menu, "Menu" },
+};
+#endif
+
 static void fake_get_info(RpEmuInfo* info) {
     info->emu_name = "Fake";
     info->emu_version = "1.0";
     info->system_name = "Smoke host self-test";
     info->supported_extensions = "bin";
     info->requires_bios = false;
+#if defined(FAKE_NOCAP)
+    // Neither serialize nor deserialize is filled in below.
+    info->capabilities = RpEmuCapability_SaveState;
+#elif defined(FAKE_MENU)
+    info->digital_actions = s_fake_digital_actions;
+    info->digital_action_count = 1;
+#endif
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -155,18 +171,6 @@ static void fake_run_frame(void* instance, RpEmuFrameContext* ctx) {
 
 #endif
 
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-static void fake_reset(void* instance) {
-    FakeEmu* emu = (FakeEmu*)instance;
-    emu->frame_index = 0;
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-static void fake_hard_reset(void* instance) {
-    fake_reset(instance);
-}
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -210,8 +214,6 @@ static RpEmuAPI s_fake_api = {
     .destroy = fake_destroy,
     .mount_media = fake_mount_media,
     .unmount_media = fake_unmount_media,
-    .reset = fake_reset,
-    .hard_reset = fake_hard_reset,
     .get_video_spec = fake_get_video_spec,
     .get_audio_spec = fake_get_audio_spec,
     .get_state = fake_get_state,
