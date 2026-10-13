@@ -84,6 +84,8 @@ static void scummvm_get_info(RpEmuInfo* info) {
     info->system_name = "Adventure Games";
     info->supported_extensions = "scummvm"; // Uses directory-based detection
     info->requires_bios = false;
+    // ScummVM has no reset and no save state the host can drive, and reads mouse and keyboard rather than Actions.
+    info->capabilities = 0;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

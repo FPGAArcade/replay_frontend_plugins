@@ -31,6 +31,7 @@ static void mesen2_ws_get_info(RpEmuInfo* info) {
     info->system_name = s_ws_info.system_name;
     info->supported_extensions = s_ws_info.extensions;
     info->requires_bios = s_ws_info.requires_bios;
+    mesen2_get_info_common(info, ConsoleType::Ws);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

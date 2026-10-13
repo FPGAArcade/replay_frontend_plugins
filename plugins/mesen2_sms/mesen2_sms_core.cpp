@@ -33,6 +33,7 @@ static void mesen2_sms_get_info(RpEmuInfo* info) {
     info->system_name = s_sms_info.system_name;
     info->supported_extensions = s_sms_info.extensions;
     info->requires_bios = s_sms_info.requires_bios;
+    mesen2_get_info_common(info, ConsoleType::Sms);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -27,6 +27,7 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <iterator>
 #include <memory>
 #include <vector>
 
@@ -216,22 +217,143 @@ class Mesen2AudioCaptureDevice : public IAudioDevice {
 };
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// Mesen2InputProvider - Maps RpEmuInputState to Mesen2 controller input
-//
-// Button mappings per console (ConsoleType enum values):
-// Nes:      Up=0, Down=1, Left=2, Right=3, Start=4, Select=5, B=6, A=7
-// Snes:     A=0, B=1, X=2, Y=3, L=4, R=5, Select=6, Start=7, Up=8, Down=9, Left=10, Right=11
-// Gameboy:  Up=0, Down=1, Left=2, Right=3, Start=4, Select=5, B=6, A=7 (also handles GBC)
-// Gba:      Up=0, Down=1, Left=2, Right=3, Start=4, Select=5, B=6, A=7, L=8, R=9
-// Sms:      Up=0, Down=1, Left=2, Right=3, B=4, A=5, Pause=6 (also handles Game Gear)
-// PcEngine: Up=0, Down=1, Left=2, Right=3, Select=4, Run=5, I=6, II=7 (also handles TurboGrafx-16)
-// Ws:       Up=0, Down=1, Left=2, Right=3, Up2=4, Down2=5, Left2=6, Right2=7, Sound=8, Start=9, B=10, A=11 (also
-// handles WSC)
+// The Actions each console's controller reads, labelled with its own button names. Entry i drives button bit i of
+// Mesen2's controller for that console, so a table is both what get_info declares and how input is fed.
+
+struct Mesen2DigitalActions {
+    const RpEmuDigitalActionLabel* actions;
+    uint32_t count;
+};
+
+static const RpEmuDigitalActionLabel s_mesen2_nes_actions[] = {
+    { RpDigitalAction_Up, "Up" },
+    { RpDigitalAction_Down, "Down" },
+    { RpDigitalAction_Left, "Left" },
+    { RpDigitalAction_Right, "Right" },
+    { RpDigitalAction_Start, "Start" },
+    { RpDigitalAction_Select, "Select" },
+    { RpDigitalAction_Secondary, "B" },
+    { RpDigitalAction_Action, "A" },
+};
+
+static const RpEmuDigitalActionLabel s_mesen2_snes_actions[] = {
+    { RpDigitalAction_Action, "A" },
+    { RpDigitalAction_Secondary, "B" },
+    { RpDigitalAction_Third, "X" },
+    { RpDigitalAction_Fourth, "Y" },
+    { RpDigitalAction_ShoulderL, "L" },
+    { RpDigitalAction_ShoulderR, "R" },
+    { RpDigitalAction_Select, "Select" },
+    { RpDigitalAction_Start, "Start" },
+    { RpDigitalAction_Up, "Up" },
+    { RpDigitalAction_Down, "Down" },
+    { RpDigitalAction_Left, "Left" },
+    { RpDigitalAction_Right, "Right" },
+};
+
+// Game Boy and Game Boy Color.
+static const RpEmuDigitalActionLabel s_mesen2_gb_actions[] = {
+    { RpDigitalAction_Up, "Up" },
+    { RpDigitalAction_Down, "Down" },
+    { RpDigitalAction_Left, "Left" },
+    { RpDigitalAction_Right, "Right" },
+    { RpDigitalAction_Start, "Start" },
+    { RpDigitalAction_Select, "Select" },
+    { RpDigitalAction_Secondary, "B" },
+    { RpDigitalAction_Action, "A" },
+};
+
+static const RpEmuDigitalActionLabel s_mesen2_gba_actions[] = {
+    { RpDigitalAction_Up, "Up" },
+    { RpDigitalAction_Down, "Down" },
+    { RpDigitalAction_Left, "Left" },
+    { RpDigitalAction_Right, "Right" },
+    { RpDigitalAction_Start, "Start" },
+    { RpDigitalAction_Select, "Select" },
+    { RpDigitalAction_Secondary, "B" },
+    { RpDigitalAction_Action, "A" },
+    { RpDigitalAction_ShoulderL, "L" },
+    { RpDigitalAction_ShoulderR, "R" },
+};
+
+// Master System and Game Gear; Mesen2 calls buttons 1 and 2 B and A.
+static const RpEmuDigitalActionLabel s_mesen2_sms_actions[] = {
+    { RpDigitalAction_Up, "Up" },
+    { RpDigitalAction_Down, "Down" },
+    { RpDigitalAction_Left, "Left" },
+    { RpDigitalAction_Right, "Right" },
+    { RpDigitalAction_Secondary, "1" },
+    { RpDigitalAction_Action, "2" },
+    { RpDigitalAction_Start, "Pause" },
+};
+
+// PC Engine and TurboGrafx-16.
+static const RpEmuDigitalActionLabel s_mesen2_pce_actions[] = {
+    { RpDigitalAction_Up, "Up" },
+    { RpDigitalAction_Down, "Down" },
+    { RpDigitalAction_Left, "Left" },
+    { RpDigitalAction_Right, "Right" },
+    { RpDigitalAction_Select, "Select" },
+    { RpDigitalAction_Start, "Run" },
+    { RpDigitalAction_Action, "I" },
+    { RpDigitalAction_Secondary, "II" },
+};
+
+// WonderSwan and WonderSwan Color: the X pad on the d-pad, the Y pad on the other face and shoulder buttons.
+static const RpEmuDigitalActionLabel s_mesen2_ws_actions[] = {
+    { RpDigitalAction_Up, "X1" },
+    { RpDigitalAction_Down, "X3" },
+    { RpDigitalAction_Left, "X4" },
+    { RpDigitalAction_Right, "X2" },
+    { RpDigitalAction_Fourth, "Y1" },
+    { RpDigitalAction_Third, "Y3" },
+    { RpDigitalAction_ShoulderL, "Y4" },
+    { RpDigitalAction_ShoulderR, "Y2" },
+    { RpDigitalAction_Select, "Sound" },
+    { RpDigitalAction_Start, "Start" },
+    { RpDigitalAction_Secondary, "B" },
+    { RpDigitalAction_Action, "A" },
+};
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+inline Mesen2DigitalActions mesen2_digital_actions(ConsoleType console_type) {
+    switch (console_type) {
+        case ConsoleType::Nes:
+            return { s_mesen2_nes_actions, (uint32_t)std::size(s_mesen2_nes_actions) };
+        case ConsoleType::Snes:
+            return { s_mesen2_snes_actions, (uint32_t)std::size(s_mesen2_snes_actions) };
+        case ConsoleType::Gameboy:
+            return { s_mesen2_gb_actions, (uint32_t)std::size(s_mesen2_gb_actions) };
+        case ConsoleType::Gba:
+            return { s_mesen2_gba_actions, (uint32_t)std::size(s_mesen2_gba_actions) };
+        case ConsoleType::Sms:
+            return { s_mesen2_sms_actions, (uint32_t)std::size(s_mesen2_sms_actions) };
+        case ConsoleType::PcEngine:
+            return { s_mesen2_pce_actions, (uint32_t)std::size(s_mesen2_pce_actions) };
+        case ConsoleType::Ws:
+            return { s_mesen2_ws_actions, (uint32_t)std::size(s_mesen2_ws_actions) };
+    }
+    return {};
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// The capabilities and Actions every Mesen2 plugin reports; the rest of RpEmuInfo is the plugin's own.
+inline void mesen2_get_info_common(RpEmuInfo* info, ConsoleType console_type) {
+    const Mesen2DigitalActions declared = mesen2_digital_actions(console_type);
+    info->capabilities = RpEmuCapability_SoftReset | RpEmuCapability_HardReset;
+    info->digital_actions = declared.actions;
+    info->digital_action_count = declared.count;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// Mesen2InputProvider - Feeds Replay's Port 1 to Mesen2's first controller through the console's Action table
 
 class Mesen2InputProvider : public IInputProvider {
   public:
     Mesen2InputProvider(Emulator* emu, ConsoleType console_type)
-        : _emu(emu), _consoleType(console_type), _input(nullptr) {
+        : _emu(emu), _actions(mesen2_digital_actions(console_type)), _input(nullptr) {
         _emu->RegisterInputProvider(this);
     }
 
@@ -248,119 +370,22 @@ class Mesen2InputProvider : public IInputProvider {
             return false;
         }
 
-        // Only handle port 0 (player 1) for now
+        // Only the first controller is fed for now.
         if (device->GetPort() != 0) {
             return false;
         }
 
         device->ClearState();
-
-        switch (_consoleType) {
-            case ConsoleType::Nes:
-                // NES: Up=0, Down=1, Left=2, Right=3, Start=4, Select=5, B=6, A=7
-                device->SetBitValue(0, _input->buttons[RpEmuButton_Up]);
-                device->SetBitValue(1, _input->buttons[RpEmuButton_Down]);
-                device->SetBitValue(2, _input->buttons[RpEmuButton_Left]);
-                device->SetBitValue(3, _input->buttons[RpEmuButton_Right]);
-                device->SetBitValue(4, _input->buttons[RpEmuButton_Start]);
-                device->SetBitValue(5, _input->buttons[RpEmuButton_Select]);
-                device->SetBitValue(6, _input->buttons[RpEmuButton_B]);
-                device->SetBitValue(7, _input->buttons[RpEmuButton_A]);
-                break;
-
-            case ConsoleType::Snes:
-                // SNES: A=0, B=1, X=2, Y=3, L=4, R=5, Select=6, Start=7, Up=8, Down=9, Left=10, Right=11
-                device->SetBitValue(0, _input->buttons[RpEmuButton_A]);
-                device->SetBitValue(1, _input->buttons[RpEmuButton_B]);
-                device->SetBitValue(2, _input->buttons[RpEmuButton_X]);
-                device->SetBitValue(3, _input->buttons[RpEmuButton_Y]);
-                device->SetBitValue(4, _input->buttons[RpEmuButton_L]);
-                device->SetBitValue(5, _input->buttons[RpEmuButton_R]);
-                device->SetBitValue(6, _input->buttons[RpEmuButton_Select]);
-                device->SetBitValue(7, _input->buttons[RpEmuButton_Start]);
-                device->SetBitValue(8, _input->buttons[RpEmuButton_Up]);
-                device->SetBitValue(9, _input->buttons[RpEmuButton_Down]);
-                device->SetBitValue(10, _input->buttons[RpEmuButton_Left]);
-                device->SetBitValue(11, _input->buttons[RpEmuButton_Right]);
-                break;
-
-            case ConsoleType::Gameboy:
-                // GB/GBC: Up=0, Down=1, Left=2, Right=3, Start=4, Select=5, B=6, A=7
-                device->SetBitValue(0, _input->buttons[RpEmuButton_Up]);
-                device->SetBitValue(1, _input->buttons[RpEmuButton_Down]);
-                device->SetBitValue(2, _input->buttons[RpEmuButton_Left]);
-                device->SetBitValue(3, _input->buttons[RpEmuButton_Right]);
-                device->SetBitValue(4, _input->buttons[RpEmuButton_Start]);
-                device->SetBitValue(5, _input->buttons[RpEmuButton_Select]);
-                device->SetBitValue(6, _input->buttons[RpEmuButton_B]);
-                device->SetBitValue(7, _input->buttons[RpEmuButton_A]);
-                break;
-
-            case ConsoleType::Gba:
-                // GBA: Up=0, Down=1, Left=2, Right=3, Start=4, Select=5, B=6, A=7, L=8, R=9
-                device->SetBitValue(0, _input->buttons[RpEmuButton_Up]);
-                device->SetBitValue(1, _input->buttons[RpEmuButton_Down]);
-                device->SetBitValue(2, _input->buttons[RpEmuButton_Left]);
-                device->SetBitValue(3, _input->buttons[RpEmuButton_Right]);
-                device->SetBitValue(4, _input->buttons[RpEmuButton_Start]);
-                device->SetBitValue(5, _input->buttons[RpEmuButton_Select]);
-                device->SetBitValue(6, _input->buttons[RpEmuButton_B]);
-                device->SetBitValue(7, _input->buttons[RpEmuButton_A]);
-                device->SetBitValue(8, _input->buttons[RpEmuButton_L]);
-                device->SetBitValue(9, _input->buttons[RpEmuButton_R]);
-                break;
-
-            case ConsoleType::Sms:
-                // SMS/Game Gear: Up=0, Down=1, Left=2, Right=3, B=4, A=5, Pause=6
-                device->SetBitValue(0, _input->buttons[RpEmuButton_Up]);
-                device->SetBitValue(1, _input->buttons[RpEmuButton_Down]);
-                device->SetBitValue(2, _input->buttons[RpEmuButton_Left]);
-                device->SetBitValue(3, _input->buttons[RpEmuButton_Right]);
-                device->SetBitValue(4, _input->buttons[RpEmuButton_B]);
-                device->SetBitValue(5, _input->buttons[RpEmuButton_A]);
-                device->SetBitValue(6, _input->buttons[RpEmuButton_Start]); // Pause mapped to Start
-                break;
-
-            case ConsoleType::PcEngine:
-                // PCE/TurboGrafx-16: Up=0, Down=1, Left=2, Right=3, Select=4, Run=5, I=6, II=7
-                device->SetBitValue(0, _input->buttons[RpEmuButton_Up]);
-                device->SetBitValue(1, _input->buttons[RpEmuButton_Down]);
-                device->SetBitValue(2, _input->buttons[RpEmuButton_Left]);
-                device->SetBitValue(3, _input->buttons[RpEmuButton_Right]);
-                device->SetBitValue(4, _input->buttons[RpEmuButton_Select]);
-                device->SetBitValue(5, _input->buttons[RpEmuButton_Start]); // Run mapped to Start
-                device->SetBitValue(6, _input->buttons[RpEmuButton_A]);     // I mapped to A
-                device->SetBitValue(7, _input->buttons[RpEmuButton_B]);     // II mapped to B
-                break;
-
-            case ConsoleType::Ws:
-                // WS/WSC: Up=0, Down=1, Left=2, Right=3, Up2=4, Down2=5, Left2=6, Right2=7, Sound=8, Start=9, B=10,
-                // A=11
-                device->SetBitValue(0, _input->buttons[RpEmuButton_Up]);
-                device->SetBitValue(1, _input->buttons[RpEmuButton_Down]);
-                device->SetBitValue(2, _input->buttons[RpEmuButton_Left]);
-                device->SetBitValue(3, _input->buttons[RpEmuButton_Right]);
-                // Up2/Down2/Left2/Right2 (4-7) could be mapped to YXBA in rotated mode
-                device->SetBitValue(4, _input->buttons[RpEmuButton_Y]);      // Up2
-                device->SetBitValue(5, _input->buttons[RpEmuButton_X]);      // Down2
-                device->SetBitValue(6, _input->buttons[RpEmuButton_L]);      // Left2
-                device->SetBitValue(7, _input->buttons[RpEmuButton_R]);      // Right2
-                device->SetBitValue(8, _input->buttons[RpEmuButton_Select]); // Sound
-                device->SetBitValue(9, _input->buttons[RpEmuButton_Start]);
-                device->SetBitValue(10, _input->buttons[RpEmuButton_B]);
-                device->SetBitValue(11, _input->buttons[RpEmuButton_A]);
-                break;
-
-            default:
-                return false;
+        const RpEmuPortInput& port = _input->ports[0];
+        for (uint32_t bit = 0; bit < _actions.count; bit++) {
+            device->SetBitValue(bit, port.digital[_actions.actions[bit].action]);
         }
-
         return true;
     }
 
   private:
     Emulator* _emu;
-    ConsoleType _consoleType;
+    Mesen2DigitalActions _actions;
     const RpEmuInputState* _input;
 };
 

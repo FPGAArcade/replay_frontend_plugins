@@ -2,15 +2,17 @@
 # The smoke host's own test: the stub passes its smoke, and every way a plugin or its configuration
 # can fail one is shown to fail, for the stated reason. Run it after changing anything under smoke/.
 #
-#   smoke/selftest.sh [debug|release|asan]
+#   smoke/selftest.sh [debug|release|asan] [--sdk-dir DIR]
 set -euo pipefail
 
 repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_dir"
 
 config="${1:-debug}"
-if ! ./build.sh stub "$config" > /dev/null; then
-    echo "smoke selftest: the build failed; run ./build.sh stub $config to see why" >&2
+# Anything after the configuration goes to every ./build.sh call, so the test can run against a local SDK.
+build_args=("${@:2}")
+if ! ./build.sh stub "$config" "${build_args[@]}" > /dev/null; then
+    echo "smoke selftest: the build failed; run ./build.sh stub $config ${build_args[*]} to see why" >&2
     exit 1
 fi
 
@@ -64,6 +66,8 @@ check "a working fake passes"                pass "PASS"          "$host" "$fake
 check "a mismatched ABI version fails"       fail "ABI version"   "$host" "$fakes/fake_abi.so" smoke/fakes/fake.toml
 check "a missing ABI version fails"          fail "exports no rp_emu_plugin_abi_version" "$host" "$fakes/fake_noabi.so" smoke/fakes/fake.toml
 check "an empty required slot fails"         fail "required slot" "$host" "$fakes/fake_noslot.so" smoke/fakes/fake.toml
+check "a capability without its slots fails" fail "without its slot 'serialize'" "$host" "$fakes/fake_nocap.so" smoke/fakes/fake.toml
+check "declaring Menu fails"                 fail "which a core is not fed" "$host" "$fakes/fake_menu.so" smoke/fakes/fake.toml
 check "asserted audio that never comes fails" fail "no audio"     "$host" "$fakes/fake_silent.so" smoke/fakes/audio.toml
 
 # Booting with nothing mounted, for a machine whose own ROM comes up on an empty drive. The fake
@@ -73,10 +77,19 @@ check "a fixture is passed as a path"        fail "refused"       "$host" "$fake
 
 # --load-only: the gate's load. Lazy binding, so a host function the plugin never calls at load does
 # not fail it.
-check "--load-only loads and names the ABI"  pass "ABI version 1" "$host" "$stub" --load-only
+check "--load-only loads and names the ABI"  pass "ABI version 2" "$host" "$stub" --load-only
 check "--load-only binds lazily"             pass "LOADED"        "$host" "$fakes/fake_import.so" --load-only
 check "--load-only still checks the ABI"     fail "ABI version"   "$host" "$fakes/fake_abi.so" --load-only
+check "--load-only still checks capabilities" fail "without its slot" "$host" "$fakes/fake_nocap.so" --load-only
 check "--load-only takes no smoke.toml"      fail "usage"         "$host" "$stub" plugins/stub/smoke.toml --load-only
+
+# Input reaches the plugin: the stub inverts its blue channel while Port 1 holds Action, so its final frame
+# differs from an idle run.
+final_hash() { "$host" "$stub" plugins/stub/smoke.toml "$@" | sed -n 's/^smoke: final frame hash //p'; }
+idle_hash="$(final_hash)"
+held_hash="$(final_hash --hold-action)"
+check "a held Action changes the stub's frame" pass "" test -n "$idle_hash" -a -n "$held_hash" -a "$idle_hash" != "$held_hash"
+check "an idle run repeats its frame"         pass "" test "$idle_hash" = "$(final_hash)"
 
 # The host's own string functions, which it defines for the plugins it loads rather than links.
 check "the host's strings round-trip"        pass "PASS"          "$host" "$fakes/fake_strings.so" smoke/fakes/fake.toml
@@ -104,9 +117,9 @@ withheld="${provenance}.withheld"
 restore_provenance() { [[ -f $withheld ]] && mv "$withheld" "$provenance"; return 0; }
 trap restore_provenance EXIT
 
-check "build.sh --smoke runs the smoke"      pass "Smoke passed"  ./build.sh stub "$config" --smoke
+check "build.sh --smoke runs the smoke"      pass "Smoke passed"  ./build.sh stub "$config" "${build_args[@]}" --smoke
 mv "$provenance" "$withheld"
-check "a red smoke does not fail build.sh"   pass "Smoke FAILED"  ./build.sh stub "$config" --smoke
+check "a red smoke does not fail build.sh"   pass "Smoke FAILED"  ./build.sh stub "$config" "${build_args[@]}" --smoke
 restore_provenance
 
 echo "smoke selftest: ${passed} passed, ${failed} failed"

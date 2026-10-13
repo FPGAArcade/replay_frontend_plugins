@@ -45,6 +45,8 @@ static void mesen2_nes_get_info(RpEmuInfo* info) {
     info->system_name = s_nes_info.system_name;
     info->supported_extensions = s_nes_info.extensions;
     info->requires_bios = s_nes_info.requires_bios;
+    mesen2_get_info_common(info, ConsoleType::Nes);
+    info->capabilities |= RpEmuCapability_DipSwitches;
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -140,6 +142,15 @@ static bool mesen2_nes_deserialize(void* ci, const void* b, size_t bs) {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+// The config word is the DIP switch word: a VS System cartridge's switches, or a mapper's. Mesen2 reads it on every
+// access, so a change applies to the running game.
+static void mesen2_nes_set_config_bitmask(void* core_instance, uint32_t config_value) {
+    Mesen2CoreBase* core = (Mesen2CoreBase*)core_instance;
+    core->emulator->GetSettings()->GetGameConfig().DipSwitches = config_value;
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 static void mesen2_nes_set_config_int(void* ci, FlString k, int32_t v) {
     (void)ci;
     (void)k;
@@ -195,7 +206,7 @@ static RpEmuAPI s_mesen2_nes_api = {
     .copy_audio = nullptr,
     .serialize = mesen2_nes_serialize,
     .deserialize = mesen2_nes_deserialize,
-    .set_config_bitmask = nullptr,
+    .set_config_bitmask = mesen2_nes_set_config_bitmask,
     .set_config_int = mesen2_nes_set_config_int,
     .set_config_float = mesen2_nes_set_config_float,
     .set_config_bool = mesen2_nes_set_config_bool,
